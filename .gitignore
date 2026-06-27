@@ -1,0 +1,20 @@
+.env
+service-account.json
+seen.txt
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+dist/
+.pytest_cache/
+
+# Playwright MCP browser automation artifacts
+.playwright-mcp/
+
+# Large reference/download files
+flatfox-api-v1.yaml
+
+# Scratch/working notes not needed in the repo
+SCRAPING_RESEARCH.md
+CODEBASE_NOTES.md
+flatbot-claude-code-prompt.md

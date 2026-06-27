@@ -1,0 +1,29 @@
+services:
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    container_name: flaresolverr
+    ports:
+      - "8191:8191"
+    environment:
+      - LOG_LEVEL=info
+    restart: unless-stopped
+
+  flatbot:
+    build: .
+    container_name: flatbot
+    depends_on:
+      - flaresolverr
+    env_file: .env
+    environment:
+      # Override FlareSolverr URL to use the compose service name, not localhost
+      - FLARESOLVERR_URL=http://flaresolverr:8191/v1
+      # Persistent data dir inside the container
+      - SEEN_STORE_PATH=/app/data/seen.txt
+    volumes:
+      - flatbot_data:/app/data
+      # Optional: mount Google service account key if GOOGLE_SERVICE_ACCOUNT_JSON is set
+      # - ./service-account.json:/app/service-account.json:ro
+    restart: unless-stopped
+
+volumes:
+  flatbot_data:
