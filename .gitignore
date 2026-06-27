@@ -1,6 +1,8 @@
 .env
 service-account.json
 seen.txt
+matches.jsonl
+/data/
 __pycache__/
 *.pyc
 .venv/
@@ -18,3 +20,6 @@ flatfox-api-v1.yaml
 SCRAPING_RESEARCH.md
 CODEBASE_NOTES.md
 flatbot-claude-code-prompt.md
+
+# sample message template
+sample-message-to-landlord.txt

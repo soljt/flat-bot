@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import html as html_module
 import logging
+import re
 
 import anthropic
 
@@ -9,138 +11,157 @@ from .adapters.base import Listing
 log = logging.getLogger(__name__)
 
 _MODEL = "claude-haiku-4-5-20251001"
+_SUBJECT_PREFIX = "Spikeboys Flatbot: "
 
 
 def generate_email(listing: Listing, api_key: str) -> tuple[str, str]:
-    """Return (subject, body) for a new listing match. Falls back to template on failure."""
+    """
+    Return (subject, html_body).
+
+    Subject is always deterministic (rooms / postcode / price).
+    The HTML body is a deterministic template; the LLM is called only to
+    write the suggested landlord message, which it returns as plain text.
+    """
+    subject = fallback_subject(listing)
+    landlord_msg = _get_landlord_message(listing, api_key)
+    body = _render_email_body(listing, landlord_msg)
+    return subject, body
+
+
+# ── Public fallbacks (used by tests and by generate_email error path) ─────────
+
+def fallback_subject(listing: Listing) -> str:
+    price = _price_str(listing)
+    return f"{_SUBJECT_PREFIX}{listing.rooms or '?'}R {listing.postcode or 'Zürich'} — {price}"
+
+
+def fallback_body(listing: Listing) -> str:
+    return _render_email_body(listing, _fallback_landlord_message())
+
+
+# ── Email body template ───────────────────────────────────────────────────────
+
+def _render_email_body(listing: Listing, landlord_msg_html: str) -> str:
+    """Build the full HTML email body from a deterministic template + landlord message."""
+    price_str = _price_str(listing)
+    platform_cap = listing.platform.capitalize()
+
+    flag_items: list[str] = []
+    if listing.price_is_teaser:
+        flag_items.append("Teaser/starting-from price — actual rent may be higher")
+    if listing.price_on_request:
+        flag_items.append("Price on request — confirm before applying")
+    if listing.no_wg_clause:
+        flag_items.append("Possible 'no shared flat' clause — check before applying")
+
+    flags_html = ""
+    if flag_items:
+        items = "".join(f"<li><strong>⚠️ {f}</strong></li>" for f in flag_items)
+        flags_html = f"\n<ul>{items}</ul>"
+
+    return f"""\
+<p><a href="{listing.url}"><strong>View listing on {platform_cap}</strong></a></p>
+{flags_html}
+<ul>
+  <li><strong>Title:</strong> {listing.title}</li>
+  <li><strong>Rooms:</strong> {listing.rooms}</li>
+  <li><strong>Rent:</strong> {price_str}</li>
+  <li><strong>Address:</strong> {listing.address or 'not specified'}</li>
+  <li><strong>Available from:</strong> {listing.available_from or 'not specified'}</li>
+</ul>
+
+<hr>
+<p><strong>Suggested message to landlord (adapt as needed):</strong></p>
+
+{landlord_msg_html}"""
+
+
+# ── Landlord message ──────────────────────────────────────────────────────────
+
+def _get_landlord_message(listing: Listing, api_key: str) -> str:
+    """Try LLM for the landlord message; fall back to the template on any failure."""
     try:
-        return _llm_generate(listing, api_key)
+        return _llm_landlord_message(listing, api_key)
     except Exception:
         log.warning(
-            "platform=%s action=llm_failed id=%s — using template fallback",
+            "platform=%s action=llm_landlord_failed id=%s — using template",
             listing.platform,
             listing.id,
             exc_info=True,
         )
-        return fallback_subject(listing), fallback_body(listing)
+        return _fallback_landlord_message()
 
 
-def _llm_generate(listing: Listing, api_key: str) -> tuple[str, str]:
+def _llm_landlord_message(listing: Listing, api_key: str) -> str:
+    """
+    Ask the LLM to write the suggested landlord message as plain text.
+    Converts the result to HTML paragraphs.
+    """
     price_str = _price_str(listing)
+    prompt = f"""Write a suggested German-language message from our group to the landlord for this flat listing.
 
-    flags: list[str] = []
-    if listing.price_is_teaser:
-        flags.append("TEASER PRICE — actual rent may be higher than listed; verify before applying")
-    if listing.price_on_request:
-        flags.append("PRICE ON REQUEST — confirm rent with landlord before applying")
-    if listing.no_wg_clause:
-        flags.append("POSSIBLE NO-SHARED-FLAT CLAUSE — description may disqualify group tenants; read carefully")
-
-    flag_block = "\n".join(f"- {f}" for f in flags) if flags else "None"
-
-    prompt = f"""Generate a notification email for a new flat listing. We are a group of 4 people flat-hunting in Zurich. We apply manually — this email alerts the group so they can act quickly.
+We are "Spikeboys" — 4 friends, 25–30 years old, all ETH graduates now working in the tech industry, looking for a flat in Zurich together.
 
 LISTING:
-Platform: {listing.platform}
-URL: {listing.url}
 Title: {listing.title}
+Address: {listing.address or 'not specified'}
 Rooms: {listing.rooms}
 Rent: {price_str}
-Postcode: {listing.postcode}
-Address: {listing.address or 'not specified'}
 Available from: {listing.available_from or 'not specified'}
-Description (excerpt): {listing.description[:600]}
+Description excerpt: {listing.description[:400]}
 
-FLAGS:
-{flag_block}
+Base the message closely on this template. Adapt the greeting if the landlord's name appears in the listing. Naturally weave in one brief, specific detail about the flat if something stands out — otherwise keep it close to the template.
 
-Respond with ONLY these two sections, nothing before or after:
+---
+Guten Tag [Anrede],
 
-SUBJECT: <one line — include rooms, Zurich postcode, and price>
-BODY:
-<body — include the URL, key facts (rooms/rent/address/availability), any flags clearly called out, then a suggested generic German-language message to the landlord the group can adapt. The suggested message must contain zero personal details — no names, no dossier contents. End with [Ihr Name] as a placeholder for the sender's name.>"""
+Ich bin gerade auf dieses Objekt gestossen und es erfüllt genau unsere Anforderungen. Wir sind 4 befreundete junge Erwachsene (25–30 Jahre alt), alle ETH Absolventen die jetzt in der Tech-Branche tätig sind, und suchen jetzt gemeinsam nach einer permanenten Bleibe in Zürich. Unser vollständiges Dossier finden Sie im Anhang.
+Sind noch Besichtigungstermine verfügbar? Wir könnten die Wohnung direkt bestätigen.
+
+Beste Grüsse,
+[Ihr Name]
+---
+
+Respond with ONLY the message text. Plain text, blank lines between paragraphs (greeting / body / sign-off). No HTML, no explanation, nothing else."""
 
     client = anthropic.Anthropic(api_key=api_key)
     msg = client.messages.create(
         model=_MODEL,
-        max_tokens=1024,
+        max_tokens=512,
         messages=[{"role": "user", "content": prompt}],
     )
-    text = msg.content[0].text.strip()
-
-    subject = ""
-    body_lines: list[str] = []
-    in_body = False
-
-    for line in text.splitlines():
-        if not in_body and line.startswith("SUBJECT:"):
-            subject = line[len("SUBJECT:"):].strip()
-        elif line.strip() == "BODY:":
-            in_body = True
-        elif in_body:
-            body_lines.append(line)
-
-    subject = subject.strip()
-    body = "\n".join(body_lines).strip()
-
-    if not subject or not body:
-        log.warning(
-            "platform=%s action=llm_parse_failed id=%s — falling back to template",
-            listing.platform,
-            listing.id,
-        )
-        return fallback_subject(listing), fallback_body(listing)
-
-    return subject, body
+    plain_text = msg.content[0].text.strip()
+    return _plain_text_to_html(plain_text)
 
 
-def fallback_subject(listing: Listing) -> str:
-    price = _price_str(listing)
-    return f"[FlatBot] {listing.rooms or '?'}R {listing.postcode or 'Zürich'} — {price}"
+def _fallback_landlord_message() -> str:
+    return (
+        "<p>Guten Tag [Anrede],</p>\n\n"
+        "<p>Ich bin gerade auf dieses Objekt gestossen und es erfüllt genau unsere Anforderungen. "
+        "Wir sind 4 befreundete junge Erwachsene (25–30 Jahre alt), alle ETH Absolventen die jetzt "
+        "in der Tech-Branche tätig sind, und suchen jetzt gemeinsam nach einer permanenten Bleibe "
+        "in Zürich. Unser vollständiges Dossier finden Sie im Anhang.<br>\n"
+        "Sind noch Besichtigungstermine verfügbar? Wir könnten die Wohnung direkt bestätigen.</p>\n\n"
+        "<p>Beste Grüsse,<br>\n[Ihr Name]</p>"
+    )
 
 
-def fallback_body(listing: Listing) -> str:
-    flags: list[str] = []
-    if listing.price_is_teaser:
-        flags.append("⚠️  Teaser/starting-from price — actual rent may be higher")
-    if listing.price_on_request:
-        flags.append("⚠️  Price on request — confirm before applying")
-    if listing.no_wg_clause:
-        flags.append("⚠️  Possible 'no shared flat' clause — check before applying")
+def _plain_text_to_html(text: str) -> str:
+    """
+    Convert plain text with blank-line paragraph separators to HTML.
+    Each paragraph becomes a <p> block; single newlines within a paragraph
+    become <br> so the line structure is preserved.
+    """
+    paragraphs = re.split(r"\n\s*\n", text.strip())
+    parts: list[str] = []
+    for para in paragraphs:
+        lines = para.strip().splitlines()
+        escaped = "<br>\n".join(html_module.escape(ln) for ln in lines)
+        parts.append(f"<p>{escaped}</p>")
+    return "\n\n".join(parts)
 
-    flag_block = ("\n" + "\n".join(flags) + "\n") if flags else ""
 
-    rent_detail = _price_str(listing)
-
-    return f"""New listing match:
-
-{listing.url}
-{flag_block}
-Details
-───────
-Rooms:      {listing.rooms}
-Rent:       {rent_detail}
-Postcode:   {listing.postcode}
-Address:    {listing.address or 'not specified'}
-Available:  {listing.available_from or 'not specified'}
-Platform:   {listing.platform}
-
-───────────────────────────────────────────────
-Suggested message to landlord (adapt as needed)
-───────────────────────────────────────────────
-
-Sehr geehrte Damen und Herren
-
-Wir haben Ihr Inserat auf {listing.platform.capitalize()} entdeckt und interessieren uns sehr für die Wohnung.
-
-Wir sind eine Gruppe von 4 Personen mit vollständigem Dossier (Betreibungsregisterauszüge, Lohnausweise usw.), das wir Ihnen auf Wunsch gerne umgehend zustellen.
-
-Für Fragen oder einen Besichtigungstermin stehen wir jederzeit zur Verfügung.
-
-Freundliche Grüsse
-[Ihr Name]
-"""
-
+# ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _price_str(listing: Listing) -> str:
     if listing.price_on_request:

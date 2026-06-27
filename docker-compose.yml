@@ -19,11 +19,9 @@ services:
       - FLARESOLVERR_URL=http://flaresolverr:8191/v1
       # Persistent data dir inside the container
       - SEEN_STORE_PATH=/app/data/seen.txt
+      - MATCH_STORE_PATH=/app/data/matches.jsonl
     volumes:
-      - flatbot_data:/app/data
+      - ./data:/app/data
       # Optional: mount Google service account key if GOOGLE_SERVICE_ACCOUNT_JSON is set
       # - ./service-account.json:/app/service-account.json:ro
     restart: unless-stopped
-
-volumes:
-  flatbot_data:

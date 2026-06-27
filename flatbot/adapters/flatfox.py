@@ -18,6 +18,8 @@ import logging
 import random
 import time
 
+import httpx
+
 from .base import (
     Adapter,
     Listing,
@@ -25,7 +27,6 @@ from .base import (
     detect_price_on_request,
     detect_teaser_price,
 )
-from .cloudflare import FlareSolverrError, FlareSolverrSession
 
 log = logging.getLogger(__name__)
 
@@ -45,11 +46,20 @@ class FlatfoxAdapter(Adapter):
         self,
         min_rooms: float,
         max_rent_chf: float,
-        session: FlareSolverrSession,
     ) -> None:
         self._min_rooms = min_rooms
         self._max_rent_chf = max_rent_chf
-        self._session = session
+        self._client = httpx.Client(
+            headers={
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+                ),
+                "Accept-Language": "de-CH,de;q=0.9,en;q=0.8",
+            },
+            timeout=30,
+            follow_redirects=True,
+        )
 
     def search(self) -> list[Listing]:
         pks = self._fetch_pks()
@@ -74,10 +84,9 @@ class FlatfoxAdapter(Adapter):
             "max_count": str(_MAX_PIN_COUNT),
         }
         try:
-            data = self._session.get_json(_PIN_URL, params, base_url=_BASE_URL)
-        except FlareSolverrError as exc:
-            log.error("platform=flatfox action=pin_transport_error error=%r", str(exc))
-            return []
+            resp = self._client.get(_PIN_URL, params=params, headers={"Accept": "application/json"})
+            resp.raise_for_status()
+            data = resp.json()
         except Exception as exc:
             log.error("platform=flatfox action=pin_request_error error=%r", str(exc))
             return []
@@ -100,13 +109,9 @@ class FlatfoxAdapter(Adapter):
             params.append(("ordering", "-pk"))
 
             try:
-                data = self._session.get_json(_LISTING_URL, params, base_url=_BASE_URL)
-            except FlareSolverrError as exc:
-                log.error(
-                    "platform=flatfox action=listing_transport_error batch=%d error=%r",
-                    batch_start, str(exc),
-                )
-                break
+                resp = self._client.get(_LISTING_URL, params=params, headers={"Accept": "application/json"})
+                resp.raise_for_status()
+                data = resp.json()
             except Exception as exc:
                 log.error(
                     "platform=flatfox action=listing_request_error batch=%d error=%r",
@@ -138,7 +143,10 @@ def _parse(item: dict) -> Listing | None:
     if pk is None:
         return None
 
-    url = item.get("url") or f"https://flatfox.ch/en/flat/{pk}/"
+    raw_url = item.get("url") or ""
+    if raw_url.startswith("/"):
+        raw_url = f"https://flatfox.ch{raw_url}"
+    url = raw_url or f"https://flatfox.ch/en/flat/{pk}/"
 
     title = (
         item.get("public_title")
@@ -150,8 +158,12 @@ def _parse(item: dict) -> Listing | None:
     description = item.get("description") or ""
     full_text = f"{title} {description}"
 
-    rent_gross = item.get("rent_gross")
-    price_chf = float(rent_gross) if rent_gross is not None else None
+    # rent_gross is null for some listings; fall back to rent_net (net rent without utilities)
+    _price_raw = item.get("rent_gross") if item.get("rent_gross") is not None else item.get("rent_net")
+    try:
+        price_chf = float(_price_raw) if _price_raw is not None else None
+    except (ValueError, TypeError):
+        price_chf = None
 
     price_display_type = str(item.get("price_display_type") or "").lower()
     price_is_teaser = "from" in price_display_type or "ab" in price_display_type

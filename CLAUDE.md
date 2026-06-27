@@ -12,14 +12,15 @@ flatbot/
 ├── config.py            # Env-var config, all settings with defaults
 ├── pipeline.py          # Main loop: fetch → filter → deduplicate → notify
 ├── store.py             # Append-only seen-ID file (seen.txt)
-├── notifier.py          # Resend email sender
+├── matchstore.py        # Cross-platform dedup store (matches.jsonl)
+├── notifier.py          # Resend email sender (HTML + plaintext fallback)
 ├── llm.py               # Anthropic API for email subject/body, template fallback
 ├── sheets.py            # Optional Google Sheets match log
 ├── logging_setup.py     # Structured stdout logging
 └── adapters/
     ├── base.py          # Listing dataclass, Adapter ABC, text-detection helpers
     ├── cloudflare.py    # FlareSolverrSession — CF bypass transport layer
-    ├── flatfox.py       # Flatfox adapter (pin → batch-fetch flow)
+    ├── flatfox.py       # Flatfox adapter (plain httpx, two-step pin→listing flow)
     └── homegate.py      # Homegate adapter (nodriver headful Chrome)
 ```
 
@@ -28,26 +29,30 @@ flatbot/
 For each adapter in sequence:
 1. `adapter.search()` → `list[Listing]`
 2. `store.contains(uid)` — skip if already seen (zero cost)
-3. `_passes_filter()` — rooms / price / postcode gate (zero cost)
-4. **Real run only**: `generate_email()` → Anthropic API → `notifier.send()`
-5. `store.add(uid)` — written only after successful send
+3. `_passes_filter()` — rooms / price (CHF 3000–6500) / postcode gate (zero cost)
+4. Compute `match_key` (normalised address or postcode+rooms+price bucket)
+5. **Cross-platform dedup**: if `match_key` already in `MatchStore` (same flat seen on another platform), add other-platform link to existing Sheet row, mark seen, skip email
+6. **Seed mode** (`--seed`): `sheets.append_row()` → `match_store.add()` → `store.add()` — no LLM, no email
+7. **Normal run**: `generate_email()` → Anthropic API → `notifier.send()` → `sheets.append_row()` → `match_store.add()` → `store.add()`
 
-`dry_run=True` skips steps 4–5 entirely; no LLM tokens, no emails, no writes.
+`dry_run=True` short-circuits before step 5; no writes of any kind.
+`seed_mode=True` short-circuits before step 7; no LLM tokens, no emails.
 
-### Seen-store guarantees
+### Seen-store and match-store guarantees
 
-- `uid = f"{platform}:{id}"` — namespaced so flatfox and homegate IDs can't collide
-- Written only on confirmed send; a crash between send and write causes one harmless duplicate (acceptable — a missed notification is worse)
-- In-memory set for O(1) lookups; append-only file for crash-safe persistence
-- Not modified by dry runs
+- `uid = f"{platform}:{id}"` — namespaced so Flatfox and Homegate IDs can't collide
+- `seen.txt` written only on confirmed send (or seed); a crash between send and write causes one harmless duplicate (acceptable — a missed notification is worse)
+- `matches.jsonl` (JSONL, append-only) maps normalised listing keys to the first notification record; enables cross-platform dedup across bot cycles
+- Both stores: in-memory for O(1) lookups; append-only file for crash-safe persistence
+- Neither is modified by dry runs
 
 ---
 
 ## Transport layers
 
-### Flatfox (`flatfox.py`) — two-step API via FlareSolverr
+### Flatfox (`flatfox.py`) — two-step public API via plain httpx
 
-Flatfox sits behind **Cloudflare Managed Challenge**. FlareSolverr (a local patched-browser proxy on `localhost:8191`) solves the CF challenge and returns cookies that the bot reuses for subsequent plain HTTPS requests via `httpx`.
+Flatfox's JSON API is accessible with a plain `httpx.Client` (no FlareSolverr needed). The adapter uses a real browser `User-Agent` header but makes no CF bypass.
 
 **Search flow** (discovered by inspecting the site's own XHR calls):
 1. `GET /api/v1/pin/?east=…&west=…&north=…&south=…&min_rooms=…&max_price=…&max_count=400`
@@ -57,7 +62,9 @@ Flatfox sits behind **Cloudflare Managed Challenge**. FlareSolverr (a local patc
 
 The `/api/v1/public-listing/` endpoint alone has **no** geo/rooms/price filter params (confirmed in the OpenAPI spec). All filtering must go through `/api/v1/pin/` first. The old approach of paginating `public-listing` without a PIN filter fetched every listing on the platform.
 
-**`FlareSolverrSession` (`cloudflare.py`):**
+If the Flatfox API starts returning 403s, it may have added CF protection — re-add `FlareSolverrSession` following the same pattern as the Homegate adapter.
+
+**`FlareSolverrSession` (`cloudflare.py`) — Homegate only:**
 - `warmup(base_url)` — solves CF challenge via FlareSolverr browser; injects `cf_clearance` cookie + UA into shared `httpx.Client`
 - `get_json(url, params)` — plain HTTPS GET with CF cookies; re-warms once on 403
 - `get_html(url, params)` — same but returns raw HTML text
@@ -99,6 +106,7 @@ All settings read from env vars or `.env`. Defaults shown below.
 | `RESEND_FROM` | required | Verified sender address |
 | `MAILING_LIST` | required | Comma-separated recipients |
 | `MIN_ROOMS` | `5.0` | Minimum room count |
+| `MIN_RENT_CHF` | `3000` | Minimum monthly gross rent (filters WG rooms) |
 | `MAX_RENT_CHF` | `6500` | Maximum monthly gross rent |
 | `POSTCODE_PREFIX` | `80` | Zurich city postcodes start with `80` |
 | `ENABLE_FLATFOX` | `true` | Toggle Flatfox adapter |
@@ -108,6 +116,7 @@ All settings read from env vars or `.env`. Defaults shown below.
 | `FLARESOLVERR_URL` | `http://localhost:8191/v1` | Overridden to `http://flaresolverr:8191/v1` in Docker |
 | `FLARESOLVERR_MAX_TIMEOUT_MS` | `60000` | CF challenge timeout |
 | `SEEN_STORE_PATH` | `seen.txt` | Set to `/app/data/seen.txt` in Docker |
+| `MATCH_STORE_PATH` | `matches.jsonl` | Cross-platform dedup store; set to `/app/data/matches.jsonl` in Docker |
 | `GOOGLE_SHEETS_ID` | _(empty)_ | Optional match log |
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | _(empty)_ | Path to service account key |
 | `CHROME_EXECUTABLE_PATH` | _(auto)_ | Override Chromium binary (set in Docker) |
@@ -119,11 +128,15 @@ All settings read from env vars or `.env`. Defaults shown below.
 ```bash
 uv sync
 
-# Start FlareSolverr (required for Flatfox)
+# Start FlareSolverr (required for Homegate)
 docker compose up -d flaresolverr
 
 # Dry run — no emails, no seen.txt writes, no LLM tokens
 uv run python -m flatbot --one-shot --dry-run
+
+# Seed run — log current inventory to the Sheet and mark it seen (no emails, no LLM)
+# Do this BEFORE going live to avoid a flood of emails on the first real run.
+uv run python -m flatbot --seed
 
 # Single real run
 uv run python -m flatbot --one-shot
@@ -149,9 +162,12 @@ docker compose logs -f flatbot
 
 # Run a dry-run inside the container
 docker compose run --rm flatbot --one-shot --dry-run
+
+# Seed run (before going live): logs all current matches to the Sheet, marks them seen
+docker compose run --rm flatbot --seed
 ```
 
-The `flatbot_data` named volume persists `seen.txt` across container restarts.
+Store files (`seen.txt`, `matches.jsonl`) are persisted in `./data/` on the host (bind-mounted to `/app/data` inside the container). This makes them easy to inspect, back up, and rsync to the Pi.
 
 **Shipping to a Raspberry Pi:**
 
@@ -209,6 +225,13 @@ The script builds an arm64 image, streams it to the Pi, copies `.env` and `docke
    ```
 
 7. **Test** with `--dry-run --one-shot` before enabling real sends.
+
+8. **Seed** the new platform before going live to avoid a notification flood. Use the `ENABLE_*` toggles to target only the new adapter:
+   ```bash
+   ENABLE_FLATFOX=false ENABLE_HOMEGATE=false ENABLE_YOURPLATFORM=true \
+     uv run python -m flatbot --seed
+   ```
+   The seed run respects the existing `MatchStore`, so a flat already notified via another platform will get the new URL added to its Sheet row rather than generating a duplicate row.
 
 ---
 

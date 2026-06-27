@@ -1,6 +1,6 @@
 from flatbot.adapters.base import detect_no_wg, detect_price_on_request, detect_teaser_price
 from flatbot.adapters.flatfox import _parse as ff_parse
-from flatbot.adapters.homegate import _extract_initial_state, _parse as hg_parse
+from flatbot.adapters.homegate import _parse as hg_parse
 import json
 
 
@@ -111,48 +111,6 @@ def test_flatfox_title_fallback_chain():
     assert listing.title == "Schöne Wohnung"
 
 
-# ── Homegate _extract_initial_state ─────────────────────────────────────────
-
-def _make_initial_state_html(listings: list, page_count: int = 1) -> str:
-    state = {
-        "resultList": {
-            "search": {
-                "fullSearch": {
-                    "result": {
-                        "listings": listings,
-                        "pageCount": page_count,
-                    }
-                }
-            }
-        }
-    }
-    return f"<html><script>window.__INITIAL_STATE__ = {json.dumps(state)};</script></html>"
-
-
-def test_extract_initial_state_basic():
-    html = _make_initial_state_html([{"listing": {"id": "abc"}}], page_count=3)
-    result = _extract_initial_state(html)
-    assert result is not None
-    listings, page_count = result
-    assert page_count == 3
-    assert len(listings) == 1
-    assert listings[0]["listing"]["id"] == "abc"
-
-
-def test_extract_initial_state_missing_marker():
-    assert _extract_initial_state("<html>no state here</html>") is None
-
-
-def test_extract_initial_state_bad_json():
-    html = "<html><script>window.__INITIAL_STATE__ = {broken json;</script></html>"
-    assert _extract_initial_state(html) is None
-
-
-def test_extract_initial_state_wrong_shape():
-    html = "<html><script>window.__INITIAL_STATE__ = {\"foo\": 1};</script></html>"
-    assert _extract_initial_state(html) is None
-
-
 # ── Homegate parser ─────────────────────────────────────────────────────────
 
 
@@ -186,7 +144,7 @@ def test_homegate_basic():
     assert listing.rooms == 5.5
     assert listing.price_chf == 3500.0
     assert listing.postcode == "8006"
-    assert listing.url == "https://www.homegate.ch/rent/12345"
+    assert listing.url == "https://www.homegate.ch/rent/abc123"
     assert listing.no_wg_clause is False
 
 

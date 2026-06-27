@@ -18,6 +18,7 @@ class Config:
 
     # Search criteria
     min_rooms: float = 5.0
+    min_rent_chf: float = 3000.0
     max_rent_chf: float = 6500.0
     postcode_prefix: str = "80"
 
@@ -39,6 +40,7 @@ class Config:
 
     # Storage
     seen_store_path: str = "seen.txt"
+    match_store_path: str = "matches.jsonl"
 
 
 def load_config() -> Config:
@@ -71,6 +73,7 @@ def load_config() -> Config:
         resend_from=resend_from,
         mailing_list=mailing_list,
         min_rooms=float(os.getenv("MIN_ROOMS", "5.0")),
+        min_rent_chf=float(os.getenv("MIN_RENT_CHF", "3000")),
         max_rent_chf=float(os.getenv("MAX_RENT_CHF", "6500")),
         postcode_prefix=os.getenv("POSTCODE_PREFIX", "80"),
         enable_flatfox=os.getenv("ENABLE_FLATFOX", "true").lower() == "true",
@@ -82,4 +85,5 @@ def load_config() -> Config:
         flaresolverr_url=os.getenv("FLARESOLVERR_URL", "http://localhost:8191/v1"),
         flaresolverr_max_timeout_ms=int(os.getenv("FLARESOLVERR_MAX_TIMEOUT_MS", "60000")),
         seen_store_path=os.getenv("SEEN_STORE_PATH", "seen.txt"),
+        match_store_path=os.getenv("MATCH_STORE_PATH", "matches.jsonl"),
     )

@@ -4,6 +4,7 @@ import pytest
 
 from flatbot.adapters.base import Listing
 from flatbot.config import Config
+from flatbot.matchstore import MatchStore
 from flatbot.notifier import Notifier
 from flatbot.pipeline import _passes_filter, run_cycle
 from flatbot.store import SeenStore
@@ -102,6 +103,22 @@ class TestPassesFilter:
         ok, _ = _passes_filter(make_listing(postcode=None), make_config())
         assert ok is True
 
+    def test_below_min_price_rejected(self):
+        ok, reason = _passes_filter(make_listing(price_chf=2500.0), make_config())
+        assert ok is False
+        assert "price" in reason
+
+    def test_min_price_boundary_passes(self):
+        # min_rent_chf default is 3000; price == 3000 should pass (strict <)
+        ok, _ = _passes_filter(make_listing(price_chf=3000.0), make_config())
+        assert ok is True
+
+    def test_teaser_price_below_min_passes(self):
+        # Teaser prices are never filtered by price bounds
+        listing = make_listing(price_chf=1000.0, price_is_teaser=True)
+        ok, _ = _passes_filter(listing, make_config())
+        assert ok is True
+
 
 # ── Full cycle ───────────────────────────────────────────────────────────────
 
@@ -188,6 +205,99 @@ class TestRunCycle:
 
         assert stats["errors"] == 1
         assert stats["notified"] == 1
+
+    def test_cross_platform_dedup_sends_once(self, tmp_path, monkeypatch):
+        """Same apartment on two platforms → one email, second counted as deduped."""
+        address = "Musterstrasse 1, 8001 Zürich"
+        listing_ff = make_listing(
+            id="ff1", platform="flatfox", address=address
+        )
+        listing_hg = make_listing(
+            id="hg1", platform="homegate", address=address
+        )
+
+        store = make_store(tmp_path)
+        ms = MatchStore(str(tmp_path / "matches.jsonl"))
+        notifier = make_notifier()
+
+        monkeypatch.setattr("flatbot.pipeline.generate_email", lambda l, k: ("Sub", "<p>Body</p>"))
+
+        stats = run_cycle(
+            [make_adapter([listing_ff]), make_adapter([listing_hg])],
+            store,
+            notifier,
+            make_config(),
+            match_store=ms,
+        )
+
+        assert stats["notified"] == 1
+        assert stats["deduped"] == 1
+        notifier.send.assert_called_once()
+        # Both UIDs should be marked seen
+        assert store.contains(listing_ff.uid)
+        assert store.contains(listing_hg.uid)
+
+    def test_seed_mode_logs_and_marks_but_does_not_send(self, tmp_path, monkeypatch):
+        """Seed mode: sheet + seen written; email + LLM never called."""
+        listing = make_listing()
+        store = make_store(tmp_path)
+        ms = MatchStore(str(tmp_path / "matches.jsonl"))
+        notifier = make_notifier()
+
+        # If generate_email were called it would raise — proving it isn't
+        monkeypatch.setattr(
+            "flatbot.pipeline.generate_email",
+            lambda l, k: (_ for _ in ()).throw(AssertionError("LLM called in seed mode")),
+        )
+
+        stats = run_cycle(
+            [make_adapter([listing])],
+            store,
+            notifier,
+            make_config(),
+            seed_mode=True,
+            match_store=ms,
+        )
+
+        assert stats["seeded"] == 1
+        assert stats["notified"] == 0
+        notifier.send.assert_not_called()
+        assert store.contains(listing.uid)
+        # Match key should be registered in the match store
+        key = ms.match_key(listing)
+        assert key is not None
+        assert ms.lookup(key) is not None
+
+    def test_seed_mode_dedupes_across_platforms(self, tmp_path, monkeypatch):
+        """Seed mode still deduplicates: same flat on two platforms → one seeded, one deduped."""
+        address = "Seedstrasse 7, 8003 Zürich"
+        listing_ff = make_listing(id="ff_s", platform="flatfox", address=address)
+        listing_hg = make_listing(id="hg_s", platform="homegate", address=address)
+
+        store = make_store(tmp_path)
+        ms = MatchStore(str(tmp_path / "matches.jsonl"))
+        notifier = make_notifier()
+
+        monkeypatch.setattr(
+            "flatbot.pipeline.generate_email",
+            lambda l, k: (_ for _ in ()).throw(AssertionError("LLM called in seed mode")),
+        )
+
+        stats = run_cycle(
+            [make_adapter([listing_ff]), make_adapter([listing_hg])],
+            store,
+            notifier,
+            make_config(),
+            seed_mode=True,
+            match_store=ms,
+        )
+
+        assert stats["seeded"] == 1
+        assert stats["deduped"] == 1
+        assert stats["notified"] == 0
+        notifier.send.assert_not_called()
+        assert store.contains(listing_ff.uid)
+        assert store.contains(listing_hg.uid)
 
     def test_cycle_summary_counts(self, tmp_path, monkeypatch):
         seen_listing = make_listing(id="seen")

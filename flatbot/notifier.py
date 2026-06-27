@@ -1,11 +1,30 @@
 from __future__ import annotations
 
+import html
 import logging
+import re
 from abc import ABC, abstractmethod
 
 import httpx
 
 log = logging.getLogger(__name__)
+
+
+def _html_to_text(html_body: str) -> str:
+    """Strip HTML tags and unescape entities to produce a plain-text fallback."""
+    # Remove style/script blocks entirely
+    text = re.sub(r"<(style|script)[^>]*>.*?</\1>", "", html_body, flags=re.DOTALL | re.IGNORECASE)
+    # Replace block-level breaks with newlines before stripping tags
+    text = re.sub(r"<br\s*/?>", "\n", text, flags=re.IGNORECASE)
+    text = re.sub(r"</(p|div|li|h[1-6]|hr|tr)>", "\n", text, flags=re.IGNORECASE)
+    text = re.sub(r"<hr\s*/?>", "\n---\n", text, flags=re.IGNORECASE)
+    # Strip remaining tags
+    text = re.sub(r"<[^>]+>", "", text)
+    # Unescape HTML entities
+    text = html.unescape(text)
+    # Collapse excessive blank lines
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip()
 
 
 class Notifier(ABC):
@@ -32,7 +51,8 @@ class ResendNotifier(Notifier):
                 "from": self._from_email,
                 "to": recipients,
                 "subject": subject,
-                "text": body,
+                "html": body,
+                "text": _html_to_text(body),
             },
             timeout=30,
         )

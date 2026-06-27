@@ -4,9 +4,9 @@ Notify-first flat-match bot for Zurich. Polls Flatfox and Homegate for flats mat
 
 ## Prerequisites
 
-Both Flatfox and Homegate are protected by Cloudflare Managed Challenge, which blocks every plain HTTP approach. Flatbot routes all scraping through **FlareSolverr**, a local open-source proxy that clears the CF challenge in a patched browser and hands back solved cookies.
+Homegate is protected by Cloudflare + DataDome bot detection, which blocks every plain HTTP approach. Flatbot clears this via **FlareSolverr** (for the Cloudflare layer) and **nodriver** headful Chrome (for DataDome). Flatfox uses a plain `httpx` client against its public JSON API.
 
-### FlareSolverr setup (Docker)
+### FlareSolverr setup (Docker — required for Homegate)
 
 1. Install [Docker Desktop](https://www.docker.com/products/docker-desktop/) if you haven't already.
 
@@ -19,7 +19,7 @@ Both Flatfox and Homegate are protected by Cloudflare Managed Challenge, which b
    ```bash
    curl -s http://localhost:8191/v1 \
      -H "Content-Type: application/json" \
-     -d '{"cmd":"request.get","url":"https://flatfox.ch/","maxTimeout":60000}' \
+     -d '{"cmd":"request.get","url":"https://homegate.ch/","maxTimeout":60000}' \
      | python -m json.tool | grep status
    ```
 
@@ -42,7 +42,11 @@ docker compose up -d flaresolverr
 # Test without sending anything
 uv run python -m flatbot --one-shot --dry-run
 
-# Real single run
+# Seed run — log current inventory to the Sheet and mark it seen (no emails, no LLM).
+# Do this BEFORE the first real run to avoid a flood of emails for already-listed flats.
+uv run python -m flatbot --seed
+
+# Real single run (after seeding)
 uv run python -m flatbot --one-shot
 
 # Long-lived loop (leave running)
@@ -62,17 +66,19 @@ All settings via environment variables or a `.env` file (see `.env.example`).
 | `RESEND_FROM` | **required** | Sender address — must be verified in Resend |
 | `MAILING_LIST` | **required** | Comma-separated recipient addresses |
 | `MIN_ROOMS` | `5.0` | Minimum room count |
+| `MIN_RENT_CHF` | `3000` | Minimum monthly rent in CHF (filters WG rooms) |
 | `MAX_RENT_CHF` | `6500` | Maximum monthly rent in CHF |
 | `POSTCODE_PREFIX` | `80` | City of Zurich = postcodes starting with `80` |
 | `POLL_INTERVAL_MIN` | `15` | Poll interval in minutes |
 | `POLL_JITTER_MIN` | `5` | Random ± jitter in minutes |
 | `ENABLE_FLATFOX` | `true` | Toggle Flatfox adapter |
 | `ENABLE_HOMEGATE` | `true` | Toggle Homegate adapter |
-| `FLARESOLVERR_URL` | `http://localhost:8191/v1` | FlareSolverr endpoint |
+| `FLARESOLVERR_URL` | `http://localhost:8191/v1` | FlareSolverr endpoint (Homegate only) |
 | `FLARESOLVERR_MAX_TIMEOUT_MS` | `60000` | Max ms FlareSolverr browser gets to clear CF |
 | `GOOGLE_SHEETS_ID` | _(optional)_ | Sheet ID for match log |
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | _(optional)_ | Path to service account key file |
 | `SEEN_STORE_PATH` | `seen.txt` | Path to the persistent seen-IDs file |
+| `MATCH_STORE_PATH` | `matches.jsonl` | Path to the cross-platform dedup store |
 
 ## Resend setup
 
@@ -93,12 +99,19 @@ uv run pytest
 ## Adding a new platform
 
 1. Create `flatbot/adapters/yourplatform.py`.
-2. Implement `class YourPlatformAdapter(Adapter)` with a `search() -> list[Listing]` method. Take a `FlareSolverrSession` as a constructor argument and use `session.get_json` / `session.get_html` for all requests.
+2. Implement `class YourPlatformAdapter(Adapter)` with a `search() -> list[Listing]` method. Pick a transport based on the site's bot protection (plain `httpx`, `FlareSolverrSession`, or `nodriver` — see `CLAUDE.md` for guidance).
 3. Register it in `flatbot/__main__.py` behind an `ENABLE_YOURPLATFORM` toggle.
+4. Before going live, seed the new platform to avoid a notification flood:
+   ```bash
+   ENABLE_FLATFOX=false ENABLE_HOMEGATE=false ENABLE_YOURPLATFORM=true \
+     uv run python -m flatbot --seed
+   ```
 
 ## Design notes
 
 - **Idempotent:** `seen.txt` persists seen listing IDs across restarts. An ID is marked seen *only after* a successful email send — a crash between send and write may double-notify once, which is the acceptable failure direction (a missed notification is worse than a rare duplicate).
+- **Cross-platform dedup:** `matches.jsonl` maps a normalised address (or postcode+rooms+price bucket) to the first notification for that flat. If the same apartment appears on two platforms, only one email is sent; the second URL is added to the existing Google Sheet row.
+- **Seed before first run:** `--seed` logs the current inventory to the Sheet and marks it seen without sending emails or calling the LLM. Run it once before going live to avoid a day-one flood.
 - **Fail loudly:** parse errors, login walls, CAPTCHA responses, and API failures are logged at WARNING/ERROR. The loop continues; the bot never improvises around anomalies.
-- **Cloudflare-aware:** both platforms sit behind CF Managed Challenge. All requests route through a local FlareSolverr instance which solves the challenge and returns cookies. The `FlareSolverrSession` in `flatbot/adapters/cloudflare.py` handles warmup, cookie injection, and re-warmup on a stale cookie.
+- **Cloudflare-aware:** Homegate sits behind CF Managed Challenge + DataDome. FlareSolverr clears the CF layer; `nodriver` headful Chrome passes DataDome fingerprinting. Flatfox uses a plain `httpx` client against its public API.
 - **Notify-only:** no login, no auto-apply, no dossier handling, no PII, no inbound ports.
