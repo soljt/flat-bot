@@ -13,6 +13,12 @@ from . import sheets
 log = logging.getLogger(__name__)
 
 
+def _sheets_url(cfg: Config) -> str | None:
+    if not cfg.google_sheets_id:
+        return None
+    return f"https://docs.google.com/spreadsheets/d/{cfg.google_sheets_id}/edit"
+
+
 def _passes_filter(listing: Listing, cfg: Config) -> tuple[bool, str]:
     if listing.rooms is not None and listing.rooms < cfg.min_rooms:
         return False, f"rooms={listing.rooms} < min={cfg.min_rooms}"
@@ -141,7 +147,7 @@ def run_cycle(
                 continue
 
             # ── Normal notify path ────────────────────────────────────────
-            subject, body = generate_email(listing, cfg.anthropic_api_key)
+            subject, body = generate_email(listing, cfg.anthropic_api_key, _sheets_url(cfg))
 
             try:
                 notifier.send(

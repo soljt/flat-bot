@@ -15,6 +15,9 @@ from .pipeline import run_cycle
 from .adapters.cloudflare import FlareSolverrSession
 from .adapters.flatfox import FlatfoxAdapter
 from .adapters.homegate import HomegateAdapter
+from .adapters.immoscout import ImmoScout24Adapter
+from .adapters.newhome import NewHomeAdapter
+from .adapters.comparis import ComparisAdapter
 from . import sheets
 
 
@@ -81,6 +84,33 @@ def main() -> None:
     if cfg.enable_homegate:
         adapters.append(
             HomegateAdapter(min_rooms=cfg.min_rooms, max_rent_chf=cfg.max_rent_chf, session=session)
+        )
+    if cfg.enable_immoscout:
+        adapters.append(
+            ImmoScout24Adapter(
+                min_rooms=cfg.min_rooms,
+                min_rent_chf=cfg.min_rent_chf,
+                max_rent_chf=cfg.max_rent_chf,
+                session=session,
+            )
+        )
+    if cfg.enable_newhome:
+        adapters.append(
+            NewHomeAdapter(
+                min_rooms=cfg.min_rooms,
+                min_rent_chf=cfg.min_rent_chf,
+                max_rent_chf=cfg.max_rent_chf,
+                session=session,
+            )
+        )
+    if cfg.enable_comparis:
+        adapters.append(
+            ComparisAdapter(
+                min_rooms=cfg.min_rooms,
+                min_rent_chf=cfg.min_rent_chf,
+                max_rent_chf=cfg.max_rent_chf,
+                session=session,
+            )
         )
 
     if not adapters:

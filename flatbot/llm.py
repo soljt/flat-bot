@@ -14,17 +14,21 @@ _MODEL = "claude-haiku-4-5-20251001"
 _SUBJECT_PREFIX = "Spikeboys Flatbot: "
 
 
-def generate_email(listing: Listing, api_key: str) -> tuple[str, str]:
+def generate_email(
+    listing: Listing, api_key: str, sheets_url: str | None = None
+) -> tuple[str, str]:
     """
     Return (subject, html_body).
 
     Subject is always deterministic (rooms / postcode / price).
     The HTML body is a deterministic template; the LLM is called only to
     write the suggested landlord message, which it returns as plain text.
+    Pass *sheets_url* to include a coordination note with a link to the
+    match-tracking Google Sheet before the suggested landlord message.
     """
     subject = fallback_subject(listing)
     landlord_msg = _get_landlord_message(listing, api_key)
-    body = _render_email_body(listing, landlord_msg)
+    body = _render_email_body(listing, landlord_msg, sheets_url)
     return subject, body
 
 
@@ -35,13 +39,15 @@ def fallback_subject(listing: Listing) -> str:
     return f"{_SUBJECT_PREFIX}{listing.rooms or '?'}R {listing.postcode or 'Zürich'} — {price}"
 
 
-def fallback_body(listing: Listing) -> str:
-    return _render_email_body(listing, _fallback_landlord_message())
+def fallback_body(listing: Listing, sheets_url: str | None = None) -> str:
+    return _render_email_body(listing, _fallback_landlord_message(), sheets_url)
 
 
 # ── Email body template ───────────────────────────────────────────────────────
 
-def _render_email_body(listing: Listing, landlord_msg_html: str) -> str:
+def _render_email_body(
+    listing: Listing, landlord_msg_html: str, sheets_url: str | None = None
+) -> str:
     """Build the full HTML email body from a deterministic template + landlord message."""
     price_str = _price_str(listing)
     platform_cap = listing.platform.capitalize()
@@ -59,8 +65,24 @@ def _render_email_body(listing: Listing, landlord_msg_html: str) -> str:
         items = "".join(f"<li><strong>⚠️ {f}</strong></li>" for f in flag_items)
         flags_html = f"\n<ul>{items}</ul>"
 
+    sheets_html = ""
+    if sheets_url:
+        sheets_html = (
+            f'\n<p><strong>Match log:</strong> '
+            f'<a href="{sheets_url}">Open Google Sheet</a> ({sheets_url})</p>'
+        )
+
+    coordination_html = ""
+    if sheets_url:
+        coordination_html = (
+            f'\n<p><strong>Before you apply:</strong> mark the '
+            f'<strong>"Human Sent Message"</strong> column in our '
+            f'<a href="{sheets_url}">match-tracking Google Sheet</a> ({sheets_url}) '
+            f'before reaching out — so only one of us contacts the landlord.</p>'
+        )
+
     return f"""\
-<p><a href="{listing.url}"><strong>View listing on {platform_cap}</strong></a></p>
+<p><a href="{listing.url}"><strong>View listing on {platform_cap}</strong></a></p>{sheets_html}
 {flags_html}
 <ul>
   <li><strong>Title:</strong> {listing.title}</li>
@@ -70,7 +92,7 @@ def _render_email_body(listing: Listing, landlord_msg_html: str) -> str:
   <li><strong>Available from:</strong> {listing.available_from or 'not specified'}</li>
 </ul>
 
-<hr>
+<hr>{coordination_html}
 <p><strong>Suggested message to landlord (adapt as needed):</strong></p>
 
 {landlord_msg_html}"""

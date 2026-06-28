@@ -21,7 +21,10 @@ flatbot/
     ├── base.py          # Listing dataclass, Adapter ABC, text-detection helpers
     ├── cloudflare.py    # FlareSolverrSession — CF bypass transport layer
     ├── flatfox.py       # Flatfox adapter (plain httpx, two-step pin→listing flow)
-    └── homegate.py      # Homegate adapter (nodriver headful Chrome)
+    ├── homegate.py      # Homegate adapter (nodriver headful Chrome)
+    ├── immoscout.py     # ImmoScout24.ch adapter (nodriver headful Chrome)
+    ├── newhome.py       # NewHome.ch adapter (nodriver + in-page fetch)
+    └── comparis.py      # Comparis.ch adapter (nodriver headful Chrome)
 ```
 
 ### Pipeline flow (`pipeline.py`)
@@ -93,6 +96,65 @@ Solution: **`nodriver`** — controls Chrome via a non-standard protocol that Da
 
 **Docker / Raspberry Pi note:** `headless=True` fails DataDome. The Docker container starts Xvfb (virtual display) in the entrypoint script so Chrome can open a "headed" window with no physical screen. `--no-sandbox` is added automatically when `/.dockerenv` is detected (required for running as root in containers).
 
+### ImmoScout24 (`immoscout.py`) — nodriver headful Chrome
+
+ImmoScout24.ch is the other major Swiss rental portal (whole-flat listings, same target audience as Homegate). It has identical bot-protection layers:
+- **Cloudflare Managed Challenge** on all pages
+- **DataDome** on search pages
+
+Transport is therefore identical to Homegate: `nodriver` headed Chrome.  The same Xvfb display started by `docker-entrypoint.sh` serves both adapters (they run sequentially, each opening and closing their own Chrome window).
+
+**Search flow:**
+1. `nodriver` opens a real Chrome window
+2. Navigates to `/en/real-estate/rent/city-zurich?nrf=<rooms>&pf=<min_price>&pt=<max_price>&pn=<page>`
+3. Polls `window.__INITIAL_STATE__` (Nuxt/Vue SSR state) until listing data appears (IS24 does not use `__NEXT_DATA__`)
+4. Navigates to subsequent pages within the same browser session (preserves DataDome cookie)
+5. Closes browser after all pages
+
+`nrf` = min rooms (number of rooms from), `pf` = price from (min CHF), `pt` = price to (max CHF), `pn` = page number (1-indexed). All three filter params are applied server-side. Bot caps at `_MAX_PAGES = 10`.
+
+**Detail URL:** `https://www.immoscout24.ch/mieten/{id}` — language-independent redirect; the `__INITIAL_STATE__` data contains no URL field so this is always constructed. Previously tried `/en/d/{id}` which 404s.
+
+**Debugging schema changes:** if IS24 restructures their `__INITIAL_STATE__`, run with `--log-level DEBUG`. The adapter logs `action=state_dump` (top-level `pageProps` keys) and `action=first_listing_sample` (first raw listing) so you can identify the new path and update `_wait_for_state` / `_parse` in `immoscout.py`.
+
+### NewHome.ch (`newhome.py`) — nodriver + in-page fetch
+
+NewHome.ch (Swiss Post's property portal) is protected by a **Cloudflare Managed Challenge** — no DataDome. The adapter uses `nodriver` to navigate to the Angular search page (which clears CF automatically), then calls the JSON API from within the browser context via `window.fetch`.
+
+**Why not FlareSolverr?** FlareSolverr clears the CF challenge on `www.newhome.ch` and injects `cf_clearance` into an `httpx` client. However, the API endpoint is on a different subdomain (`service.newhome.ch`) and CF validates that the `Sec-Fetch-Site` header is `same-site` (i.e., the request must originate from within a `www.newhome.ch` browser context). Injecting the cookie into `httpx` fails this check — only a browser already on `www.newhome.ch` can call the service subdomain.
+
+**Search flow:**
+1. `nodriver` opens Chrome and navigates to `https://www.newhome.ch/de/mieten/suchen/wohnung/ort-zuerich/liste` — CF challenge cleared automatically
+2. After Angular initialises (12s wait), calls `service.newhome.ch/api/api/SearchListingRequest` from within the page via `window.fetch` (carries correct `Sec-Fetch-Site` and CF cookies)
+3. Stores fetch result in `window._nh_result_N` and polls until it appears (nodriver's `evaluate()` does not await Promises)
+4. Paginates via `skipCount` (0, 20, 40 …); stops when `skipCount >= totalResultCount` or `_MAX_PAGES` is reached
+
+Key params: `location=1;2560` (Zürich municipality, covers all 80xx postcodes — semicolon must not be URL-encoded), `offerType=2` (rent), `propertyType=100` (house or apartment — **required, API rejects `propertyType=0`**), `roomsMin` / `roomsMax` / `priceMin` / `priceMax` (server-side filtering), `rowCount=20`, `languageIso=de`. `totalResultCount` gives the total matching count.
+
+Entry fields: `immocode` (ID), `title`, `street` (includes house number), `city`, `postalCode`, `price` (gross rent CHF), `rooms`, `availabilityDate`.
+
+**Detail URL:** `https://www.newhome.ch/en/renting/properties/apartment/apartment/city-{city-slug}/{rooms}-room/detail/{id}` — the slug segments are SEO-only decoration; the ID is the actual key. Previously used `/de/mieten/immobilien/detail/{id}` which 404s. City slug: lowercase, ü→ue, ö→oe, ä→ae, prefixed with `city-` (e.g. Zürich → `city-zuerich`). Rooms: decimal if non-integer (5.5 → `5.5-room`, 5 → `5-room`).
+
+### Comparis.ch (`comparis.py`) — nodriver headful Chrome
+
+Comparis.ch is a major Swiss comparison portal. Its real-estate section is a Next.js app. The site is protected by **DataDome only** (no Cloudflare), making it identical in difficulty to Homegate — `nodriver` headed Chrome is required.
+
+**Search flow:**
+1. `nodriver` opens a real Chrome window
+2. Navigates to `/immobilien/result/list?requestobject=<JSON>&page=N` (page 0-indexed; omitted for page 0)
+3. Accepts the CMP consent dialog on first page ("I Accept" / "Alle akzeptieren" in main document)
+4. Polls `document.getElementById('__NEXT_DATA__').textContent` (Next.js SSR state) until `initialResultData.resultItems` appears
+5. Navigates to subsequent pages within the same session (preserves DataDome cookie)
+6. Closes browser after all pages
+
+**Important:** The old paths `/immobilien/marktplatz/suche/mieten?RegionId=...` (dead — 404 "Ups!") and `/immobilien/marktplatz/zuerich/wohnung/mieten?p=N` (ignores all filters server-side) are both wrong. The correct path is `/immobilien/result/list?requestobject={...}`. Pagination is via `&page=N` as a **separate URL parameter** (not inside the `requestobject` JSON).
+
+The `requestobject` JSON holds all filters: `DealType=10` (rent), `LocationSearchString="zurich"`, `RoomsFrom` (string, min rooms), `PriceFrom` / `PriceTo` (strings, CHF range), `Sort=11` (newest first). All filters are applied server-side — the response contains only matching listings.
+
+Key data fields: `AdId` (listing ID), `Title`, `PriceValue` (numeric CHF), `EssentialInformation` (["5.5 Zimmer", "3. OG", …] — rooms in index 0), `Address` (["8006 Zürich"] — postcode + city, no street). Detail URL: `/immobilien/marktplatz/details/show/{AdId}`.
+
+**Debugging schema changes:** run with `--log-level DEBUG` to see `action=state_dump` (pageProps keys) and `action=first_item_sample` (first raw item). Adjust `_wait_for_state` / `_parse` in `comparis.py` accordingly.
+
 ---
 
 ## Configuration (`config.py`)
@@ -111,6 +173,9 @@ All settings read from env vars or `.env`. Defaults shown below.
 | `POSTCODE_PREFIX` | `80` | Zurich city postcodes start with `80` |
 | `ENABLE_FLATFOX` | `true` | Toggle Flatfox adapter |
 | `ENABLE_HOMEGATE` | `true` | Toggle Homegate adapter |
+| `ENABLE_IMMOSCOUT` | `true` | Toggle ImmoScout24.ch adapter |
+| `ENABLE_NEWHOME` | `true` | Toggle NewHome.ch adapter |
+| `ENABLE_COMPARIS` | `true` | Toggle Comparis.ch adapter |
 | `POLL_INTERVAL_MIN` | `15` | Minutes between cycles |
 | `POLL_JITTER_MIN` | `5` | ± random jitter in minutes |
 | `FLARESOLVERR_URL` | `http://localhost:8191/v1` | Overridden to `http://flaresolverr:8191/v1` in Docker |
@@ -145,7 +210,7 @@ uv run python -m flatbot --one-shot
 uv run python -m flatbot
 ```
 
-A Chrome window will appear briefly during each cycle for the Homegate scrape.
+Two Chrome windows will appear briefly during each cycle — one for the Homegate scrape and one for the ImmoScout24/Comparis scrapes (nodriver adapters run sequentially).
 
 ---
 
@@ -204,7 +269,7 @@ The script builds an arm64 image, streams it to the Pi, copies `.env` and `docke
 3. **Choose a transport** based on the site's protection:
    - **No protection / plain API**: use `httpx` directly
    - **Cloudflare only**: use `session.get_json()` or `session.get_html()` (FlareSolverrSession)
-   - **Cloudflare + DataDome** (like Homegate): use `nodriver` with Xvfb in Docker; see `homegate.py` for the pattern
+   - **Cloudflare + DataDome** (like Homegate and ImmoScout24): use `nodriver` with Xvfb in Docker; see `homegate.py` and `immoscout.py` for the pattern
    - **Cloudflare + full-page render needed**: use `session.fetch_via_flaresolverr(url, session=fs_sid)` — slower but guaranteed
 
 4. **Inspect the site's real API** before scraping HTML. Open DevTools → Network, apply your search filters, and look for XHR/fetch calls. Both Flatfox and Homegate turned out to have undocumented JSON endpoints that are far more reliable than HTML scraping.

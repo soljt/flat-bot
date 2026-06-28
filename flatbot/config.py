@@ -25,6 +25,9 @@ class Config:
     # Platform toggles
     enable_flatfox: bool = True
     enable_homegate: bool = True
+    enable_immoscout: bool = True
+    enable_newhome: bool = True
+    enable_comparis: bool = True
 
     # Poll schedule
     poll_interval_min: int = 15
@@ -78,6 +81,9 @@ def load_config() -> Config:
         postcode_prefix=os.getenv("POSTCODE_PREFIX", "80"),
         enable_flatfox=os.getenv("ENABLE_FLATFOX", "true").lower() == "true",
         enable_homegate=os.getenv("ENABLE_HOMEGATE", "true").lower() == "true",
+        enable_immoscout=os.getenv("ENABLE_IMMOSCOUT", "true").lower() == "true",
+        enable_newhome=os.getenv("ENABLE_NEWHOME", "true").lower() == "true",
+        enable_comparis=os.getenv("ENABLE_COMPARIS", "true").lower() == "true",
         poll_interval_min=int(os.getenv("POLL_INTERVAL_MIN", "15")),
         poll_jitter_min=int(os.getenv("POLL_JITTER_MIN", "5")),
         google_sheets_id=os.getenv("GOOGLE_SHEETS_ID", ""),
