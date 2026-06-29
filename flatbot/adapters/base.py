@@ -77,3 +77,12 @@ class Adapter(ABC):
     @abstractmethod
     def search(self) -> list[Listing]:
         ...
+
+    def get_available_from(self, url: str) -> str | None:
+        """Fetch the detail page and return the availability date string, or None.
+
+        Default returns None (search API already provides the date, or the
+        platform doesn't expose one).  Browser-based adapters whose search API
+        omits this field override this with a detail-page scrape.
+        """
+        return None

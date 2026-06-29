@@ -64,6 +64,7 @@ import json
 import logging
 import os
 import random
+import re
 from urllib.parse import urlencode
 
 import nodriver as uc
@@ -314,8 +315,8 @@ def _parse(entry: dict) -> Listing | None:
     address_parts = [p for p in [street, f"{postcode} {city}".strip()] if p]
     address = ", ".join(address_parts) or None
 
-    avail_raw = entry.get("availabilityDate")
-    available_from: str | None = str(avail_raw)[:10] if avail_raw else None
+    avail_raw = str(entry.get("availabilityDate") or "")[:10]
+    available_from: str | None = avail_raw if re.match(r"^\d{4}-\d{2}-\d{2}$", avail_raw) else None
 
     city_slug = _city_slug(entry.get("city") or "Zürich")
     rooms_slug = _rooms_slug(rooms)

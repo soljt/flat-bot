@@ -1,0 +1,73 @@
+{
+  "AdId": 37551052,
+  "SiteId": 245,
+  "AdStatus": 0,
+  "Title": "Exclusive 5.5-Room Gallery Penthouse with Fireplace and Greenery Views",
+  "PropertyTypeText": "Maisonette",
+  "Address": [
+    "8046 Zürich"
+  ],
+  "EssentialInformation": [
+    "5.5 Zimmer",
+    "141 m²",
+    "2. Etage"
+  ],
+  "Price": "4'320",
+  "Currency": "CHF",
+  "Date": "2026-06-26T11:18:48",
+  "ImageUrl": "/immobilien/api/image/getdirect?guid=05d881a1-8498-4b0b-a891-562d8eef96df&w=458&h=344&rm=3&mw=1024&mh=1024",
+  "ImageUrls": [
+    "/immobilien/api/image/getdirect?guid=05d881a1-8498-4b0b-a891-562d8eef96df&w=458&h=344&rm=3&mw=1024&mh=1024",
+    "/immobilien/api/image/getdirect?guid=ec23b3d2-c3d0-4459-b687-2c65b0ef6f01&w=458&h=344&rm=3&mw=1024&mh=1024",
+    "/immobilien/api/image/getdirect?guid=f02a3209-c60d-484d-aa97-724e1994d5b6&w=458&h=344&rm=3&mw=1024&mh=1024",
+    "/immobilien/api/image/getdirect?guid=6080ff6f-8bcd-4a7e-ad2f-d795869e8f9c&w=458&h=344&rm=3&mw=1024&mh=1024",
+    "/immobilien/api/image/getdirect?guid=02165582-7a9b-4b30-83ce-9700672c81e6&w=458&h=344&rm=3&mw=1024&mh=1024",
+    "/immobilien/api/image/getdirect?guid=dcf821d5-0fe0-4c48-8de6-28daf0214dc1&w=458&h=344&rm=3&mw=1024&mh=1024",
+    "/immobilien/api/image/getdirect?guid=90ce9138-7a5f-4f1e-870a-3b556f57c391&w=458&h=344&rm=3&mw=1024&mh=1024",
+    "/immobilien/api/image/getdirect?guid=ff25c4bc-1ab7-4044-aea5-2ba68ae9b0f7&w=458&h=344&rm=3&mw=1024&mh=1024",
+    "/immobilien/api/image/getdirect?guid=1b7a1a7c-80d9-4529-bac8-929468d0ff42&w=458&h=344&rm=3&mw=1024&mh=1024",
+    "/immobilien/api/image/getdirect?guid=e2a3e516-02e6-4c84-82e1-5cb1e0890170&w=458&h=344&rm=3&mw=1024&mh=1024"
+  ],
+  "Remarks": "Located in a quiet area of Zurich-Affoltern, this exceptional 5.5-room attic gallery apartment offers charm, generous living space, and immediate access to nature.<br /><br />The apartment impresses with its distinctive maisonette layout, high sloping ceilings with exposed wooden elements, and an impressive living area featuring a gallery and a fireplace. The spacious floor plan creates a bright and open living environment and offers a variety of possibilities for families, couples, flat-sharing communities or those working from home.<br /><br />Approximately 167 m² of usable space includes a generous living and dining area, three bedrooms on the lower level, an open gallery with a separate room, a kitchen, a bathroom with bathtub/WC, and an additional bathroom with shower/WC. Large windows and skylights provide abundant natural light throughout the apartment.<br /><br />A particular highlight is the sunny balcony with unobstructed views of the surrounding greenery. Adjacent meadows, forests, and recreational areas create a natural and peaceful atmosphere, while shopping facilities, schools, daycare centers, and public transportation are all within easy walking distance.<br /><br />Apartment Highlights<br /><br />5.5-room attic gallery apartment with maisonette character on the 2nd floor<br />Approx. 167 m² usable area<br />Spacious living space with fireplace<br />Open gallery suitable as a home office, reading corner, or hobby area<br />Sunny balcony overlooking green surroundings<br />Spacious rooms on two levels<br />Renovated kitchen with induction hob, oven, dishwasher, and fridge<br />Two bathrooms (bathtub/WC and shower/WC)<br />Parquet flooring in the living areas<br />Private basement storage room<br />Private wash machine and dryer in the basement<br />Pets are welcome<br />Quiet, family-friendly location within the City of Zurich (Zone 110), surrounded by forests, farms, and protected natural areas<br />SBB railway station, post office, and shopping facilities (Migros, Denner, Coop) within a few minutes' walk<br />Schools and daycare centers located within the neighborhood and easily reachable on foot<br />Zurich city center and Oerlikon can be reached within approximately 10 minutes by car or conveniently by public transportation (bus lines 62 and 61, S-Bahn line S6, and trolleybus line 32)<br />Immediate proximity to ETH Zurich Hönggerberg campus (bus lines 80, 37, and 42)<br />Close to popular recreational areas including Chatzensee and Käferberg forest<br />The apartment is situated in a well-maintained residential neighborhood in Zurich-Affoltern. The combination of living close to nature, excellent infrastructure, and quick access to Oerlikon, Zurich Airport, and Zurich city center makes this apartment an ideal home for those who value space, tranquility, and quality of life.<br /><br />Please note that the building does not have an elevator.<br /><br />Optional: One or two underground parking spaces available, each for CHF 135 per month.<br />",
+  "YearOfConstruction": 1981,
+  "RenovationYear": 2020,
+  "IsPremiumListed": false,
+  "ComparisPoints": null,
+  "Partners": [],
+  "PartnerLogoUrl": "https://assets.comparis.ch/image/upload/v1/immobilien/Images/Static/logo_large_site_245.jpg",
+  "PartnerName": "Comparis",
+  "ContactInformation": {
+    "HasContactForm": true,
+    "HasMissingAddressContactForm": true,
+    "HasMissingFloorPlanContactForm": true,
+    "ContactSiteId": 245,
+    "ContactSiteName": "Comparis",
+    "ContactSiteLogoUrl": null,
+    "ContactFormType": 1,
+    "DefaultContactMessage": "Guten Tag\r\nIch interessiere mich für das Objekt 'Exclusive 5.5-Room Gallery Penthouse with Fireplace and Greenery Views' in Zürich. Bitte kontaktieren Sie mich. Freundliche Grüsse",
+    "AdvertiserInformation": null,
+    "VendorInformation": null,
+    "VisitationContactInformation": null,
+    "IsVendorContactForm": false,
+    "OnlineApplicationUrl": null,
+    "OnlineApplicationRemarks": null
+  },
+  "PriceDevelopmentDirection": null,
+  "PriceValue": 4320,
+  "AreaValue": 141,
+  "PropertyTypeId": 12,
+  "DealType": 10,
+  "UseInternalLinks": false,
+  "ShowComparisRating": false,
+  "MemberLogoUrl": null,
+  "ShowDefaultPersonalizationSegment": false,
+  "PriceTypeText": "Mietpreis pro Monat",
+  "Facts": null,
+  "ViewTypes": [],
+  "PriceType": 5,
+  "Coordinate": {
+    "Latitude": 47.4228755,
+    "Longitude": 8.5147336
+  },
+  "IsSwapping": false
+}

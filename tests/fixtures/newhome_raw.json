@@ -1,0 +1,75 @@
+{
+  "immocode": 6122524,
+  "title": "JAMES Albisrieden - Wohnen Sie Exklusiv",
+  "offerType": 2,
+  "propertyType": 2,
+  "propertySubType": 201,
+  "secondaryPropertySubTypes": [
+    201
+  ],
+  "streetType": 1,
+  "street": "Anemonenstrasse 40 A",
+  "city": "Zürich",
+  "postalCode": "8047",
+  "latitude": 47.381252822178,
+  "longitude": 8.495840061687,
+  "contactLogoUrl": "https://www.newhome.ch/res/anb/497910/logo.png?t=638016817425606884",
+  "contactCompanyName": "Livit AG",
+  "priceType": 2,
+  "price": 4180,
+  "priceNegotiable": false,
+  "availabilityType": 2,
+  "availabilityDate": "2026-10-01T00:00:00+00:00",
+  "floor": 4,
+  "rooms": 6.5,
+  "livingArea": 186,
+  "constructionYear": 2007,
+  "images": [
+    {
+      "path": "https://www.newhome.ch/res/6122524/ort-zuerich/anemonenstrasse/wohnung/wohnung-148273837-trnh.jpg",
+      "labels": "Rezeption / Lobby - Brandschutzsprinkler"
+    },
+    {
+      "path": "https://www.newhome.ch/res/6122524/ort-zuerich/anemonenstrasse/wohnung/wohnung-148273838-trnh.jpg",
+      "labels": "Terrasse - Terrasse"
+    },
+    {
+      "path": "https://www.newhome.ch/res/6122524/ort-zuerich/anemonenstrasse/wohnung/wohnung-148273839-trnh.jpg",
+      "labels": "Aussenansicht"
+    },
+    {
+      "path": "https://www.newhome.ch/res/6122524/ort-zuerich/anemonenstrasse/wohnung/wohnung-148273840-trnh.jpg",
+      "labels": "Leerer Raum - Natürliches Licht, Gipskartonwand, Sockelleisten, Holzfussboden"
+    },
+    {
+      "path": "https://www.newhome.ch/res/6122524/ort-zuerich/anemonenstrasse/wohnung/wohnung-148273841-trnh.jpg",
+      "labels": "Leerer Raum - Natürliches Licht, Gipskartonwand, Sockelleisten, Holzfussboden"
+    },
+    {
+      "path": "https://www.newhome.ch/res/6122524/ort-zuerich/anemonenstrasse/wohnung/wohnung-148273842-trnh.jpg",
+      "labels": "Küche - Natürliches Licht, Weisse Schränke, Ofen, Fliesenboden, Herd, Waschbecken, Kühlschrank, Arbeitsplatten"
+    },
+    {
+      "path": "https://www.newhome.ch/res/6122524/ort-zuerich/anemonenstrasse/wohnung/wohnung-148273843-trnh.jpg",
+      "labels": "Bad - Waschbecken, Fliesenboden, Fliesenwand, Spiegel, Toilette, Dusche, Komplettes Badezimmer"
+    }
+  ],
+  "hasTopPromotion": false,
+  "hasHighlight": false,
+  "hasSpecialPromotion": false,
+  "has3DModel": false,
+  "isNewResult": false,
+  "customerId": 497910,
+  "customerRole": 2,
+  "legalForm": 2,
+  "searchLocation": {
+    "displayName": "Zürich",
+    "postalcode": "8047",
+    "locationType": 1,
+    "coordinate": {
+      "longitude": 8.490609,
+      "latitude": 47.3728833
+    },
+    "identifier": "2"
+  }
+}

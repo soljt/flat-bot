@@ -184,7 +184,16 @@ def _parse(item: dict) -> Listing | None:
     address_parts = [p for p in [street, f"{postcode} {city}".strip()] if p]
     address = ", ".join(address_parts) or None
 
-    available_from = item.get("moving_date") or item.get("available_from")
+    moving_date = item.get("moving_date")
+    moving_date_type = (item.get("moving_date_type") or "").lower()
+    if moving_date:
+        available_from: str | None = str(moving_date)
+    elif moving_date_type == "imm":
+        available_from = "sofort"
+    elif moving_date_type == "agr":
+        available_from = "by agreement"
+    else:
+        available_from = None
 
     if not title:
         title = f"{rooms or '?'}R Zürich {postcode}"
@@ -197,7 +206,7 @@ def _parse(item: dict) -> Listing | None:
         rooms=rooms,
         postcode=postcode or None,
         address=address,
-        available_from=str(available_from) if available_from else None,
+        available_from=available_from,
         description=description,
         platform="flatfox",
         price_is_teaser=price_is_teaser,

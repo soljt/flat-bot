@@ -24,3 +24,8 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["flatbot"]
+
+[tool.pytest.ini_options]
+markers = [
+    "integration: live network / browser tests; opt-in only (run with -m integration)",
+]

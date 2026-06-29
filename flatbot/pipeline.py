@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import logging
 
 from .adapters.base import Adapter, Listing
@@ -110,12 +111,14 @@ def run_cycle(
                 stats["notified"] += 1
                 continue
 
-            # Compute match key once; used for both dedup lookup and registration below.
-            match_key = match_store.match_key(listing) if match_store is not None else None
+            # Compute all dedup keys once; used for lookup and registration below.
+            # All keys are tried on lookup and stored on write so that two listings
+            # for the same flat match even when they share only address OR only title.
+            listing_keys = match_store.match_keys(listing) if match_store is not None else []
 
             # ── Cross-platform dedup ──────────────────────────────────────
-            if match_store is not None and match_key is not None:
-                existing = match_store.lookup(match_key)
+            if match_store is not None and listing_keys:
+                existing = match_store.lookup_any(listing)
                 if existing is not None:
                     log.info(
                         "platform=%s action=deduped id=%s matched_uid=%s",
@@ -134,14 +137,34 @@ def run_cycle(
                     stats["deduped"] += 1
                     continue
 
+            # ── Enrich: detail-page scrape for available_from ─────────────────
+            # Fires for any new listing that will generate a sheet row (seed
+            # or normal run) — never for dry runs (short-circuited above).
+            if listing.available_from is None:
+                try:
+                    avail = adapter.get_available_from(listing.url)
+                    if avail:
+                        listing = dataclasses.replace(listing, available_from=avail)
+                        log.debug(
+                            "platform=%s action=enriched id=%s available_from=%s",
+                            listing.platform, listing.id, avail,
+                        )
+                except Exception:
+                    log.warning(
+                        "platform=%s action=enrich_failed id=%s",
+                        listing.platform, listing.id,
+                        exc_info=True,
+                    )
+
             # ── Seed mode: log to sheet + mark seen, no email / LLM ──────
             if seed_mode:
                 log.info("platform=%s action=seed id=%s", listing.platform, listing.id)
                 sheet_row = sheets.append_row(
                     listing, cfg.google_sheets_id, cfg.google_service_account_json
                 )
-                if match_store is not None and match_key is not None:
-                    match_store.add(match_key, listing.uid, listing.url, sheet_row)
+                if match_store is not None and listing_keys:
+                    for _key in listing_keys:
+                        match_store.add(_key, listing.uid, listing.url, sheet_row)
                 store.add(listing.uid)
                 stats["seeded"] += 1
                 continue
@@ -171,8 +194,9 @@ def run_cycle(
             )
 
             # Register in match store ONLY after a successful send
-            if match_store is not None and match_key is not None:
-                match_store.add(match_key, listing.uid, listing.url, sheet_row)
+            if match_store is not None and listing_keys:
+                for _key in listing_keys:
+                    match_store.add(_key, listing.uid, listing.url, sheet_row)
 
             # Mark as seen ONLY after a successful send
             store.add(listing.uid)

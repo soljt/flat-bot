@@ -1,0 +1,107 @@
+{
+  "pk": 85871796,
+  "slug": "grosswiesenstrasse-8-8051-zurich",
+  "url": "/de/wohnung/grosswiesenstrasse-8-8051-zurich/85871796/",
+  "short_url": "/85871796/",
+  "submit_url": "/de/listing/85871796/submit/",
+  "status": "act",
+  "created": "2026-03-16T14:10:06.527162+01:00",
+  "offer_type": "RENT",
+  "object_category": "APARTMENT",
+  "object_type": "APARTMENT",
+  "reference": "61.viavida_market.6636.33.0102",
+  "ref_property": "61",
+  "ref_house": "viavida_market",
+  "ref_object": "6636.33.0102",
+  "alternative_reference": null,
+  "price_display": 4090,
+  "price_display_type": "TOTAL",
+  "price_unit": "monthly",
+  "published": "2026-03-16T14:10:13.294297+01:00",
+  "rent_net": 3770,
+  "rent_charges": 320,
+  "rent_gross": 4090,
+  "short_title": "5 ½ Zimmer-Wohnung",
+  "public_title": "Grosswiesenstrasse 8, 8051 Zürich - CHF 4’090",
+  "pitch_title": "5 ½ Zimmer-Wohnung in Zürich mieten",
+  "description_title": "\"ViaVida\" - Ihr neues Zuhause zwischen Stadt und Natur",
+  "description": "**Ab sofort Besichtigungen der Musterwohnung möglich!**\n\n**ViaVida - Dein Fenster ins Grüne**\n\nIn Zürich-Schwamendingen entsteht das moderne Neubauprojekt **\"ViaVida\"** , das **Stadtleben und Natur** vereint. Vier eigenständige Gebäude fügen sich harmonisch in eine **Parkanlage** mit **Grünflächen** und **Begegnungszonen** ein. Hier wohnen Sie ruhig im Grünen und sind schnell in der Stadt. \n\nDer vielfältige **Wohnungsmix** reicht von kompakten **1-Zimmer-Studios** bis zu grosszügigen **5.5-Zimmer-Wohnungen** ideal für Singles, Paare, Familien oder Wohngemeinschaften. Die Wohnungen überzeugen mit **klaren Grundrissen** , **hellen Räumen** und **hochwertigen Materialien** . **Loggien, Balkone, Terrassen** oder **Gartensitzplätze** erweitern den Wohnraum ins Freie. \n\n**Nachhaltigkeit** spielt eine zentrale Rolle: Das Projekt strebt eine **SNBS-Zertifizierung** an, die hohe **Energieeffizienz** , **nachhaltige Materialien** und eine **kompakte Bauweise** garantiert. Die **parkähnliche grüne Anlage** fördert Austausch und ein lebendiges Miteinander. \n\n**Ihre Vorteile auf einen Blick:**\n\n  * **Moderner Ausbaustandard** und **hochwertige Materialien**\n  * **Praktische Einbaumöbel** , **Waschtürme** und **funktionale Küchen**\n  * **ÖV, Schulen, Einkauf und Freizeitangebote** in unmittelbarer Nähe \n  * **Mobility-Carsharing-Angebot** sowie gute **Velo- und Fusswegverbindungen**\n  * **Grünflächen** und **Begegnungszonen** direkt vor der Haustüre \n  * **Urban gelegen** mit schneller Anbindung in die Innenstadt \n  * **Gemeinschaftsräume** fördern **Begegnung** und **Austausch**\n\n\n\n**Bezug der Wohnungen: etappenweise von Februar bis April 2027**\n\nAb sofort haben Sie die Möglichkeit, einen Termin für die **Besichtigung der möblierten Musterwohnung** zu vereinbaren. Ihren Besichtigungstermin können Sie unter folgendem Link buchen: **https://viavida.melon.market/action/appointments-booking-general-with-contact**\n\nDa sich das Projekt aktuell noch im Bau befindet, können **keine individuellen Wohnungen** besichtigt werden. \n\nEine Besichtigung der Musterwohnung ist selbstverständlich freiwillig eine Bewerbung für Ihre Wunschwohnung ist jederzeit auch ohne vorgängige Besichtigung möglich. \n\nAlle relevanten Informationen, Grundrisse sowie Visualisierungen der Wohnungen finden Sie auf der Projektwebseite. \n\nFinde deine Wunschwohnung jetzt und bewirb dich direkt online - schnell und unkompliziert - auf: \n\nwww.viavida-wohnen.ch \n\n_**Hinweis zu den Visualisierungen:** _   \n_Die dargestellten Visualisierungen und Ansichten dienen der Illustration und können von der tatsächlichen Ausführung abweichen. Sie zeigen teilweise möblierte Beispielwohnungen und sind unverbindlich._",
+  "surface_living": 110,
+  "surface_property": null,
+  "surface_usable": null,
+  "surface_usable_minimum": null,
+  "volume": null,
+  "space_display": 110,
+  "number_of_rooms": "5.5",
+  "floor": 1,
+  "attributes": [
+    {
+      "name": "parkingspace"
+    },
+    {
+      "name": "view"
+    },
+    {
+      "name": "garage"
+    },
+    {
+      "name": "balconygarden"
+    },
+    {
+      "name": "accessiblewithwheelchair"
+    },
+    {
+      "name": "lift"
+    }
+  ],
+  "is_furnished": false,
+  "is_temporary": false,
+  "is_selling_furniture": false,
+  "is_swap": false,
+  "street": "Grosswiesenstrasse 8",
+  "zipcode": 8051,
+  "city": "Zürich",
+  "public_address": "Grosswiesenstrasse 8, 8051 Zürich",
+  "latitude": 47.4033319,
+  "longitude": 8.582937,
+  "year_built": null,
+  "year_renovated": null,
+  "moving_date_type": "dat",
+  "moving_date": "2027-04-01",
+  "video_url": null,
+  "tour_url": "https://biganto.com/tour/47621",
+  "website_url": "https://viavida-wohnen.ch/",
+  "live_viewing_url": null,
+  "cover_image": 47333251,
+  "images": [
+    47333251,
+    47333261,
+    47333263,
+    47333265,
+    47333268,
+    47333273,
+    47333274
+  ],
+  "documents": [
+    694190
+  ],
+  "agency": {
+    "name": "Tend AG",
+    "name_2": null,
+    "street": "Zürcherstrasse 39",
+    "zipcode": "8952",
+    "city": "Schlieren",
+    "country": "CH",
+    "logo": {
+      "url": "/media/org/2026/06/nqjo5zeze2vjm27d601x0vcqlhw3jiev3o5oylasypydpfvcv9.png",
+      "url_org_logo_m": "/thumb/org/2026/06/nqjo5zeze2vjm27d601x0vcqlhw3jiev3o5oylasypydpfvcv9.png?alias=org_logo_m&signature=KfZUvgyfSlyPI5F9BUJuPhqIy1Bb9L0URZYHB0uiNBU"
+    }
+  },
+  "reserved": false,
+  "state": null,
+  "country": "CH",
+  "smg_id": "4003010021",
+  "flatfox_priority_exclusive_until": null,
+  "rent_title": "5 ½ Zimmer-Wohnung in Zürich mieten",
+  "livingspace": 110
+}

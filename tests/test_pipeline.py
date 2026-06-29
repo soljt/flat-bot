@@ -129,7 +129,7 @@ class TestRunCycle:
         store = make_store(tmp_path)
         notifier = make_notifier()
 
-        monkeypatch.setattr("flatbot.pipeline.generate_email", lambda l, k: ("Sub", "Body"))
+        monkeypatch.setattr("flatbot.pipeline.generate_email", lambda l, k, s=None: ("Sub", "Body"))
 
         stats = run_cycle([make_adapter([listing])], store, notifier, make_config())
 
@@ -155,7 +155,7 @@ class TestRunCycle:
         notifier = make_notifier()
         notifier.send.side_effect = RuntimeError("smtp timeout")
 
-        monkeypatch.setattr("flatbot.pipeline.generate_email", lambda l, k: ("Sub", "Body"))
+        monkeypatch.setattr("flatbot.pipeline.generate_email", lambda l, k, s=None: ("Sub", "Body"))
 
         stats = run_cycle([make_adapter([listing])], store, notifier, make_config())
 
@@ -178,7 +178,7 @@ class TestRunCycle:
         store = make_store(tmp_path)
         notifier = make_notifier()
 
-        monkeypatch.setattr("flatbot.pipeline.generate_email", lambda l, k: ("Sub", "Body"))
+        monkeypatch.setattr("flatbot.pipeline.generate_email", lambda l, k, s=None: ("Sub", "Body"))
 
         stats = run_cycle(
             [make_adapter([listing])], store, notifier, make_config(), dry_run=True
@@ -199,7 +199,7 @@ class TestRunCycle:
         store = make_store(tmp_path)
         notifier = make_notifier()
 
-        monkeypatch.setattr("flatbot.pipeline.generate_email", lambda l, k: ("Sub", "Body"))
+        monkeypatch.setattr("flatbot.pipeline.generate_email", lambda l, k, s=None: ("Sub", "Body"))
 
         stats = run_cycle([bad, good], store, notifier, make_config())
 
@@ -220,7 +220,7 @@ class TestRunCycle:
         ms = MatchStore(str(tmp_path / "matches.jsonl"))
         notifier = make_notifier()
 
-        monkeypatch.setattr("flatbot.pipeline.generate_email", lambda l, k: ("Sub", "<p>Body</p>"))
+        monkeypatch.setattr("flatbot.pipeline.generate_email", lambda l, k, s=None: ("Sub", "<p>Body</p>"))
 
         stats = run_cycle(
             [make_adapter([listing_ff]), make_adapter([listing_hg])],
@@ -308,7 +308,7 @@ class TestRunCycle:
         store.add(seen_listing.uid)
         notifier = make_notifier()
 
-        monkeypatch.setattr("flatbot.pipeline.generate_email", lambda l, k: ("Sub", "Body"))
+        monkeypatch.setattr("flatbot.pipeline.generate_email", lambda l, k, s=None: ("Sub", "Body"))
 
         stats = run_cycle(
             [make_adapter([seen_listing, new_listing, filtered_listing])],

@@ -62,6 +62,7 @@ import json
 import logging
 import os
 import random
+import re
 from urllib.parse import urlencode
 
 import nodriver as uc
@@ -107,7 +108,32 @@ class ImmoScout24Adapter(Adapter):
             log.error("platform=immoscout24 action=search_failed error=%r", str(exc))
             return []
 
+    def get_available_from(self, url: str) -> str | None:
+        try:
+            return asyncio.run(self._async_get_available_from(url))
+        except Exception as exc:
+            log.warning("platform=immoscout24 action=detail_fetch_failed url=%s error=%r", url, str(exc))
+            return None
+
     # ── async implementation ─────────────────────────────────────────────────
+
+    async def _async_get_available_from(self, url: str) -> str | None:
+        extra_args = ["--disable-dev-shm-usage"]
+        if _IN_DOCKER:
+            extra_args.append("--no-sandbox")
+        browser = await uc.start(
+            headless=False,
+            browser_executable_path=_CHROME_BIN,
+            browser_args=extra_args,
+        )
+        try:
+            tab = await browser.get(url)
+            await asyncio.sleep(5)
+            html = await tab.evaluate("(function() { return document.documentElement.innerHTML; })()")
+            return _extract_available_from_html(html or "")
+        finally:
+            browser.stop()
+            await asyncio.sleep(0.5)
 
     async def _async_search(self) -> list[Listing]:
         extra_args = ["--disable-dev-shm-usage"]
@@ -341,6 +367,24 @@ class ImmoScout24Adapter(Adapter):
 
         log.info("platform=immoscout24 action=fetched count=%d", len(listings))
         return listings
+
+
+def _extract_available_from_html(html: str) -> str | None:
+    """Extract availability from the rendered IS24 detail page.
+
+    Primary source: the structured key-value pair rendered in the page body:
+      <dt>Verfügbarkeit:</dt><dd>Nach Vereinbarung</dd>
+      <dt>Verfügbarkeit:</dt><dd>Sofort</dd>
+      <dt>Verfügbarkeit:</dt><dd>01.09.2026</dd>
+
+    Returns the value verbatim. Falls back to a JSON-embedded ISO date.
+    """
+    m = re.search(r"<dt>Verf[^<]{0,20}:</dt>\s*<dd>([^<]+)</dd>", html, re.IGNORECASE)
+    if m:
+        val = m.group(1).strip()
+        return val or None
+    m = re.search(r'"availableFrom"\s*:\s*"(\d{4}-\d{2}-\d{2})', html)
+    return m.group(1) if m else None
 
 
 def _parse(item: dict) -> Listing | None:

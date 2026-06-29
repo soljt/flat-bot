@@ -161,7 +161,41 @@ class ComparisAdapter(Adapter):
             log.error("platform=comparis action=search_failed error=%r", str(exc))
             return []
 
+    def get_available_from(self, url: str) -> str | None:
+        try:
+            return asyncio.run(self._async_get_available_from(url))
+        except Exception as exc:
+            log.warning("platform=comparis action=detail_fetch_failed url=%s error=%r", url, str(exc))
+            return None
+
     # ── async implementation ─────────────────────────────────────────────────
+
+    async def _async_get_available_from(self, url: str) -> str | None:
+        extra_args = ["--disable-dev-shm-usage"]
+        if _IN_DOCKER:
+            extra_args.append("--no-sandbox")
+        browser = await uc.start(
+            headless=False,
+            browser_executable_path=_CHROME_BIN,
+            browser_args=extra_args,
+        )
+        try:
+            tab = await browser.get(url)
+            await self._accept_consent(tab)
+            nd_text = await tab.evaluate(r"""
+                (function() {
+                    var el = document.getElementById('__NEXT_DATA__');
+                    return el ? el.textContent : null;
+                })()
+            """)
+            if not nd_text:
+                return None
+            data = json.loads(nd_text)
+            ad = data.get("props", {}).get("pageProps", {}).get("ad") or {}
+            return _extract_available_from_ad(ad)
+        finally:
+            browser.stop()
+            await asyncio.sleep(0.5)
 
     async def _async_search(self) -> list[Listing]:
         extra_args = ["--disable-dev-shm-usage"]
@@ -399,6 +433,24 @@ class ComparisAdapter(Adapter):
         return listings
 
 
+def _extract_available_from_ad(ad: dict) -> str | None:
+    """Extract AvailableDate from a Comparis detail-page ad object.
+
+    MainData is a list of {Key, Title, Value} dicts.  AvailableDate.Value is
+    either "sofort" (immediately available) or a German date "dd.mm.yyyy".
+    """
+    for item in (ad.get("MainData") or []):
+        if item.get("Key") == "AvailableDate":
+            val = (item.get("Value") or "").strip()
+            if not val:
+                return None
+            m = re.match(r"^(\d{2})\.(\d{2})\.(\d{4})$", val)
+            if m:
+                return f"{m.group(3)}-{m.group(2)}-{m.group(1)}"
+            return val
+    return None
+
+
 # ── regex to extract numeric rooms from "5.5 Zimmer" etc. ───────────────────
 _ROOMS_RE = re.compile(r"(\d+(?:[.,]\d)?)\s*(?:Zimmer|zimmer|Z\b|Zim)", re.IGNORECASE)
 
@@ -448,7 +500,7 @@ def _parse(item: dict) -> Listing | None:
         postcode=postcode or None,
         address=addr_str or None,
         available_from=None,
-        description=description[:500] if description else None,
+        description=description[:500],
         platform="comparis",
         price_is_teaser=price_is_teaser,
         price_on_request=price_on_request,

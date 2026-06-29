@@ -1,0 +1,218 @@
+{
+  "listingType": {
+    "type": "PREMIUM"
+  },
+  "id": "4002956406",
+  "listing": {
+    "address": {
+      "geoCoordinates": {
+        "latitude": 47.380051933959,
+        "longitude": 8.553362384708,
+        "accuracy": "HIGH"
+      },
+      "locality": "Zürich",
+      "postalCode": "8044",
+      "street": "Schmelzbergstrasse 53"
+    },
+    "categories": [
+      "APARTMENT",
+      "FLAT"
+    ],
+    "characteristics": {
+      "isChildFriendly": true,
+      "livingSpace": 113,
+      "hasBalcony": true,
+      "isNewBuilding": true,
+      "yearBuilt": 1899,
+      "numberOfRooms": 5,
+      "hasElevator": true,
+      "hasWashingMachine": true,
+      "isQuiet": true,
+      "yearLastRenovated": 2026,
+      "floor": 0
+    },
+    "id": "4002956406",
+    "localization": {
+      "primary": "de",
+      "it": {
+        "isMachineTranslated": true,
+        "attachments": [],
+        "text": {
+          "title": "Primo affitto di un appartamento di 5 locali in una proprietà elegante nel distretto 7",
+          "description": "Appartamento di 5 locali situato in una zona tranquilla, al piano terra superiore di una bellissima proprietà nel quartiere di Fluntern, a pochi minuti a piedi sopra l'ospedale universitario. La casa contiene 4 appartamenti sovrapposti, che sono accessibili con l'ascensore. L'edificio storico è stato costruito nel 1899, si trova in uno dei quartieri più ricercati sul Zürichberg e dispone di ottime connessioni di trasporto pubblico.L'appartamento include un piccolo giardino privato (vedi area tratteggiata nel piano dell'appartamento).La grande cucina lussuosamente attrezzata invita a soggiornare. Il bagno elegantemente progettato dispone di una doccia, di una vasca da bagno, di un doppio lavandino con mobile da bagno, di un water e di una torre di lavaggio. Davanti si trova un bagno per gli ospiti separato. Le due camere da letto spaziose di 13 e 18 m2 si presentano con un'altezza della stanza di 2,70 m.La proprietà appena rinnovata è alimentata con energia tramite sonde geotermiche con pompa di calore. Gli appartamenti dispongono di riscaldamento a pavimento con raffreddamento, di radiatori e di ventilazione dell'appartamento controllata. Tutte le stanze da vivo e da notte sono equipaggiate con pavimenti in legno pregiato elegantemente progettati a forma di losanga.Abbiamo suscitato il tuo interesse? Allora ci piacerebbe che tu ci contattassi per concordare una visita personalizzata dell'appartamento."
+        }
+      },
+      "en": {
+        "text": {
+          "title": "First occupancy of a 5-room apartment in a stylish property in district 7",
+          "description": "Quietly located 5-room apartment on the upper ground floor of a very beautiful property in the Fluntern city quarter, just a few minutes' walk above the university hospital. The house contains 4 apartments stacked on top of each other, which are accessible by lift. The listed building was constructed in 1899, is located in one of the most sought-after quarters on the Zürichberg and has excellent public transport connections.The apartment includes a small private garden (see hatched area in the floor plan).The large, luxuriously equipped kitchen invites you to linger. The elegantly designed bathroom has a shower, a bathtub, a double sink with vanity unit, a toilet and a washing tower. In front of it is a separate guest toilet. The two spacious bedrooms with 13 and 18 m2 present themselves with a room height of 2.70 m.The freshly renovated property is supplied with energy via geothermal probes with a heat pump. The apartments have underfloor heating with cooling, radiators and controlled apartment ventilation. All living and sleeping rooms are equipped with elegant herringbone parquet floors.Have we sparked your interest? Then we look forward to your contact to arrange a personal apartment viewing."
+        },
+        "attachments": [],
+        "isMachineTranslated": true
+      },
+      "fr": {
+        "attachments": [],
+        "text": {
+          "description": "Appartement de 5 pièces situé dans un quartier calme, au rez-de-chaussée supérieur d'une très belle propriété dans le quartier de Fluntern, à quelques minutes à pied au-dessus de l'hôpital universitaire. La maison contient 4 appartements empilés les uns sur les autres, qui sont accessibles par ascenseur. Le bâtiment classé a été construit en 1899, est situé dans l'un des quartiers les plus recherchés sur le Zürichberg et dispose d'excellentes connexions de transport en commun.L'appartement comprend un petit jardin privé (voir zone hachurée sur le plan d'étage).La propriété fraîchement rénovée est alimentée en énergie via des sondes géothermiques avec une pompe à chaleur. Les appartements disposent d'un chauffage par le sol avec refroidissement, de radiateurs et d'une ventilation d'appartement contrôlée. Toutes les pièces de vie et de nuit sont équipées de parquets en bois franc élégants en forme de losange.Nous avons suscité votre intérêt ? Nous nous réjouissons alors de votre contact pour convenir d'une visite personnalisée de l'appartement.",
+          "title": "Premier occupation d'un appartement de 5 pièces dans une propriété élégante dans le district 7"
+        },
+        "isMachineTranslated": true
+      },
+      "de": {
+        "attachments": [
+          {
+            "file": "7d902d86cc.jpg",
+            "alt": "3 story building, brick facade, multiple balconies, large windows, entrance with stairs",
+            "url": "https://media2.homegate.ch/listings/v2/hgonif/4002956406/image/de9b329a09d4737a2a1dca6077810362.jpg",
+            "type": "IMAGE",
+            "caption": "Titelbild"
+          },
+          {
+            "type": "IMAGE",
+            "alt": "3 story yellow house, several windows, balcony, 2 doors",
+            "url": "https://media2.homegate.ch/listings/v2/hgonif/4002956406/image/f382f01d464c86531c9c23a7acf927bd.jpg",
+            "file": "500dbf799f.jpg"
+          },
+          {
+            "url": "https://media2.homegate.ch/listings/v2/hgonif/4002956406/document/7481202f4e48d2279a7f3fed5d9dc9b1.pdf",
+            "file": "Grundriss EG.pdf",
+            "type": "DOCUMENT"
+          },
+          {
+            "file": "0fd2aba4e6.jpg",
+            "url": "https://media2.homegate.ch/listings/v2/hgonif/4002956406/image/6e3a13f48b183615cd3179689567df53.jpg",
+            "type": "IMAGE",
+            "alt": "elevator, wooden handrail, tiled floor, white walls, wooden floor"
+          },
+          {
+            "type": "IMAGE",
+            "alt": "Empty room with wooden parquet flooring, white walls, and two doors leading to other rooms.",
+            "url": "https://media2.homegate.ch/listings/v2/hgonif/4002956406/image/6387c52802830b1f44e4cdaaa9d93861.jpg",
+            "file": "27d6e0c641.jpg"
+          },
+          {
+            "alt": "Empty room with wooden parquet flooring, white walls, large windows, and a white ceiling.",
+            "file": "39d64d7756.jpg",
+            "type": "IMAGE",
+            "url": "https://media2.homegate.ch/listings/v2/hgonif/4002956406/image/c2013102dd416cc15cfc41cad2632789.jpg"
+          },
+          {
+            "url": "https://media2.homegate.ch/listings/v2/hgonif/4002956406/image/586af77ae7cc1bbd770e9d3a0047283b.jpg",
+            "type": "IMAGE",
+            "alt": "Empty room with wooden parquet floor, white walls, large windows, and a ceiling lamp",
+            "file": "289a73749c.jpg"
+          },
+          {
+            "alt": "Empty room with wooden parquet flooring, white walls, white doors, and a ceiling with white trim and a hanging light fixture.",
+            "url": "https://media2.homegate.ch/listings/v2/hgonif/4002956406/image/2cfe178ad139a0cf564e756f7c94c348.jpg",
+            "file": "d84a340313.jpg",
+            "type": "IMAGE"
+          },
+          {
+            "alt": "Stone facade, white door, black fence, stairs, windows, paved pathway",
+            "url": "https://media2.homegate.ch/listings/v2/hgonif/4002956406/image/1df18a6218e573e090cda1a274e1b7ed.jpg",
+            "type": "IMAGE",
+            "file": "978d601299.jpg"
+          },
+          {
+            "type": "IMAGE",
+            "file": "08ae807a4b.jpg",
+            "alt": "empty room, wooden floor, white walls, two large windows, radiators",
+            "url": "https://media2.homegate.ch/listings/v2/hgonif/4002956406/image/410551c2b50e269c766e455cb05c3d2b.jpg"
+          },
+          {
+            "type": "IMAGE",
+            "file": "6f68da8fcf.jpg",
+            "url": "https://media2.homegate.ch/listings/v2/hgonif/4002956406/image/e83195758aae61143062d2a4e2301f93.jpg",
+            "alt": "empty room, wooden parquet floor, white walls, white doors, wooden paneling on walls"
+          },
+          {
+            "file": "bae481cd77.jpg",
+            "alt": "Empty kitchen with white walls, tiled floor, double sink, window, and a door",
+            "url": "https://media2.homegate.ch/listings/v2/hgonif/4002956406/image/ff04f9203b566d7dc0730497566a7e18.jpg",
+            "type": "IMAGE"
+          },
+          {
+            "alt": "modern kitchen with gray cabinets, granite countertop, stainless steel sink, double oven, wooden floor",
+            "file": "0dc151ea50.jpg",
+            "type": "IMAGE",
+            "url": "https://media2.homegate.ch/listings/v2/hgonif/4002956406/image/e01dc299ddff7207f8d98269f4fc8e36.jpg"
+          },
+          {
+            "file": "be4ea6767f.jpg",
+            "url": "https://media2.homegate.ch/listings/v2/hgonif/4002956406/image/cf41ef6d9d76e80bb26f3aeba8256e9d.jpg",
+            "alt": "modern kitchen with gray cabinets, black countertops, double oven, sink, faucet, tiled floor",
+            "type": "IMAGE"
+          },
+          {
+            "type": "IMAGE",
+            "file": "0dc311e440.jpg",
+            "alt": "A room with a white wardrobe, wooden floor, and white walls",
+            "url": "https://media2.homegate.ch/listings/v2/hgonif/4002956406/image/32bec37404d1794dff414e2257dd6964.jpg"
+          },
+          {
+            "file": "c5ffcf90ae.jpg",
+            "type": "IMAGE",
+            "alt": "modern bathroom with bathtub, two sinks, toilet, large window",
+            "url": "https://media2.homegate.ch/listings/v2/hgonif/4002956406/image/582a00f68f5de91f3a157f2eaf7d4397.jpg"
+          },
+          {
+            "file": "af813ae7f1.jpg",
+            "alt": "modern bathroom with bathtub, double sink, mirror, washing machine, and window",
+            "type": "IMAGE",
+            "url": "https://media2.homegate.ch/listings/v2/hgonif/4002956406/image/bb582345d4741fbf49b0476ec9d50602.jpg"
+          },
+          {
+            "file": "c68c5bcbdd.jpg",
+            "alt": "modern bathroom with large mirror, two sinks, bathtub, shower, and a glass partition",
+            "type": "IMAGE",
+            "url": "https://media2.homegate.ch/listings/v2/hgonif/4002956406/image/f4c3aa72fccc5bc59fc668f645899b6a.jpg"
+          },
+          {
+            "alt": "small bathroom with toilet, sink, mirror, and wooden floor",
+            "url": "https://media2.homegate.ch/listings/v2/hgonif/4002956406/image/aa2164814237e505e665eb7d4dd2c597.jpg",
+            "file": "e9055dbc0e.jpg",
+            "type": "IMAGE"
+          }
+        ],
+        "isMachineTranslated": false,
+        "text": {
+          "description": "Ruhig gelegene 5-Zimmerwohnung im Hochparterre einer sehr schönen Liegenschaft im Stadtquartier Fluntern, nur wenige Gehminuten oberhalb des Universitätsspitals. Im Haus befinden sich 4 übereinander liegende Wohnungen, welche mit einem Lift erschlossen sind. Das denkmalgeschützte Haus wurde 1899 erstellt, liegt in einem der gefragtesten Quartiere am Zürichberg und verfügt über eine vorzügliche ÖV-Anbindung.Zur Wohnung gehört ein eigener kleiner Garten (s. schraffierter Bereich im Grundriss).Die grosse, luxuriös ausgestattete Wohnküche lädt zum Verweilen ein. Das edel materialisierte Badezimmer verfügt über eine Dusche, eine Badewanne, einen Doppelwaschtisch mit Lavabomöbel, eine Toilette sowie einen Waschturm. Davor befindet sich eine separate Gäste-Toilette. Die beiden grosszügigen Schlafzimmer mit 13 und 18 m2 präsentieren sich mit einer Raumhöhe von 2.70 m.Die frisch renovierte Liegenschaft wird energetisch über Erdsonden mit Wärmepumpe versorgt. Die Wohnungen verfügen über Bodenheizung mit Rückkühlung, Radiatoren sowie kontrollierte Wohnungslüftung. Sämtliche Wohn- und Schlafräume sind mit edlen Fischgrat-Parkettböden ausgestattet.Haben wir Ihr Interesse geweckt? Dann freuen wir uns über Ihre Kontaktnahme zur Vereinbarung einer persönlichen Wohnungsbesichtigung.",
+          "title": "Erstbezug einer 5-Zimmerwohnung in stilvoller Liegenschaft im Kreis 7"
+        }
+      }
+    },
+    "meta": {
+      "createdAt": "2026-02-24T12:03:39.657Z"
+    },
+    "offerType": "RENT",
+    "platforms": [
+      "immoscout24",
+      "homegate",
+      "alleimmobilien",
+      "home",
+      "immostreet"
+    ],
+    "prices": {
+      "buy": {},
+      "rent": {
+        "gross": 5650,
+        "net": 5300,
+        "extra": 350,
+        "interval": "MONTH"
+      },
+      "currency": "CHF"
+    },
+    "valueAddedServices": {}
+  },
+  "listingCard": {
+    "size": "L"
+  },
+  "listingScores": {
+    "listingCompletenessScore": 7.5,
+    "packageScore": 5
+  },
+  "listerBranding": {
+    "isQualityPartner": false
+  }
+}
