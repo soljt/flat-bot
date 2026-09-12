@@ -38,7 +38,7 @@ Search API called from within the page
     &priceMax=N        — server-side max rent CHF
     &rowCount=20
     &skipCount=N
-    &order=0
+    &order=1            — sort newest first
     &numberOfSpecialPromotions=0
     &languageIso=de
 
@@ -72,6 +72,8 @@ import nodriver as uc
 _IN_DOCKER = os.path.exists("/.dockerenv")
 _CHROME_BIN = os.getenv("CHROME_EXECUTABLE_PATH") or None
 
+from collections.abc import Callable
+
 from .base import Adapter, Listing, detect_no_wg, detect_price_on_request, detect_teaser_price
 
 log = logging.getLogger(__name__)
@@ -104,7 +106,13 @@ class NewHomeAdapter(Adapter):
         self._min_rent_chf = min_rent_chf
         self._max_rent_chf = max_rent_chf
 
-    def search(self) -> list[Listing]:
+    def search(self, is_seen: Callable[[str], bool] | None = None) -> list[Listing]:
+        # NewHome sorts newest-first (order=1), but deliberately does NOT
+        # early-exit: entries carry no publication timestamp, so there's no way
+        # to *verify* the ordering at runtime the way the other adapters do.
+        # NewHome has no DataDome (only a one-time Cloudflare challenge), so a
+        # full paginated scan each cycle is cheap and safe, and order=1 ensures
+        # the capped pages are the most recent. `is_seen` is accepted for parity.
         try:
             return asyncio.run(self._async_search())
         except Exception as exc:
@@ -142,7 +150,7 @@ class NewHomeAdapter(Adapter):
             f"&priceMax={int(self._max_rent_chf)}"
             f"&rowCount={_ROW_COUNT}"
             f"&skipCount={skip}"
-            f"&order=0"
+            f"&order=1"  # 1 = newest first (so the capped pages are the most recent)
             f"&numberOfSpecialPromotions=0"
             f"&languageIso=de"
         )

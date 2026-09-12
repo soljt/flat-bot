@@ -50,6 +50,16 @@ For each adapter in sequence:
 - Both stores: in-memory for O(1) lookups; append-only file for crash-safe persistence
 - Neither is modified by dry runs
 
+### Seen-aware early-exit (adaptive pagination)
+
+`Adapter.search(is_seen)` takes a `uid -> bool` predicate (`store.contains`, passed by the pipeline). Adapters that fetch **newest-first** stop paginating as soon as a whole page is already seen (`base.page_all_seen`): once an entire page is seen, everything older is too, so there's nothing new left. This keeps steady-state cycles to ~1 page instead of walking the full result set every cycle — the fix for broad searches (few rooms → dozens of pages) that otherwise trip DataDome (ImmoScout) and waste time.
+
+- **First run / seed**: the seen store is empty, so no page is ever "all seen" → the full result set (up to `_MAX_PAGES`) is fetched, exactly as before. Early-exit only kicks in once there's history. **Corollary:** a proper flood-free go-live still requires a complete seed scan so all current inventory is marked seen.
+- **Newest-first requirement**: early-exit is only safe if results are newest-first, which each platform is forced to via an explicit sort param — **Flatfox** `ordering=-pk` (+ we `sorted(pks, reverse=True)`), **Homegate/ImmoScout** `o=dateCreated-desc`, **Comparis** `Sort=3` (+ `&sort=3`). None of these default to newest-first (the SMG default is `topListing`, Comparis's is relevance) — verified live.
+- **Runtime guard** (Homegate, ImmoScout via `listing.meta.createdAt`; Comparis via the item `Date` field): if a later page carries something newer than the previous page's oldest, it logs `action=order_not_newest_first` and disables early-exit for that run (full scan — safe, never silently skips new flats). This is the safety net if a sort param ever regresses.
+- **NewHome is exempt**: sorts newest-first (`order=1`) but its entries carry no publication timestamp, so the ordering can't be verified at runtime; since it has no DataDome, it always full-scans (cheap and safe) rather than trust an unguarded early-exit. `search()` accepts `is_seen` for interface parity and ignores it.
+- Log line `action=early_exit ... reason=all_seen` marks where a scan stopped.
+
 ---
 
 ## Transport layers
@@ -93,7 +103,9 @@ Solution: **`nodriver`** — controls Chrome via a non-standard protocol that Da
 5. Navigates to subsequent pages within the same browser session (preserves DataDome cookie)
 6. Closes browser after all pages
 
-`ac` = min rooms (Anzahl Zimmer), `al` = max price, `ep` = page number (1-indexed). Each page has 20 listings; `pageCount` gives total pages; bot caps at `_MAX_PAGES = 10`.
+`ac` = min rooms (Anzahl Zimmer), `ag` = min gross rent, `ah` = max gross rent, `ep` = page number (1-indexed), `o=dateCreated-desc` = sort newest-first. Each page has 20 listings; `pageCount` gives total pages; bot caps at `_MAX_PAGES = 10`.
+
+**Gotcha:** `al` is **living surface (m²)**, NOT price. An earlier version used `al` for max rent, so Homegate never actually price-filtered server-side (the pipeline's own price filter masked the mistake — you'd just see out-of-range prices in the browser). Price is `ag`/`ah`. Without `o=dateCreated-desc` the default sort is `topListing` (promoted/relevance), whose dates are scrambled — required for the seen-based early-exit to be valid.
 
 **Docker / Raspberry Pi note:** `headless=True` fails DataDome. The Docker container starts Xvfb (virtual display) in the entrypoint script so Chrome can open a "headed" window with no physical screen. `--no-sandbox` is added automatically when `/.dockerenv` is detected (required for running as root in containers).
 
@@ -112,7 +124,7 @@ Transport is therefore identical to Homegate: `nodriver` headed Chrome.  The sam
 4. Navigates to subsequent pages within the same browser session (preserves DataDome cookie)
 5. Closes browser after all pages
 
-`nrf` = min rooms (number of rooms from), `pf` = price from (min CHF), `pt` = price to (max CHF), `pn` = page number (1-indexed). All three filter params are applied server-side. Bot caps at `_MAX_PAGES = 10`.
+`nrf` = min rooms (number of rooms from), `pf` = price from (min CHF), `pt` = price to (max CHF), `pn` = page number (1-indexed), `o=dateCreated-desc` = sort newest-first (same SMG param as Homegate; needed for the seen-based early-exit). All filter params are applied server-side. Bot caps at `_MAX_PAGES = 10`.
 
 **Detail URL:** `https://www.immoscout24.ch/mieten/{id}` — language-independent redirect; the `__INITIAL_STATE__` data contains no URL field so this is always constructed. Previously tried `/en/d/{id}` which 404s.
 
@@ -130,7 +142,7 @@ NewHome.ch (Swiss Post's property portal) is protected by a **Cloudflare Managed
 3. Stores fetch result in `window._nh_result_N` and polls until it appears (nodriver's `evaluate()` does not await Promises)
 4. Paginates via `skipCount` (0, 20, 40 …); stops when `skipCount >= totalResultCount` or `_MAX_PAGES` is reached
 
-Key params: `location=1;2560` (Zürich municipality, covers all 80xx postcodes — semicolon must not be URL-encoded), `offerType=2` (rent), `propertyType=100` (house or apartment — **required, API rejects `propertyType=0`**), `roomsMin` / `roomsMax` / `priceMin` / `priceMax` (server-side filtering), `rowCount=20`, `languageIso=de`. `totalResultCount` gives the total matching count.
+Key params: `location=1;2560` (Zürich municipality, covers all 80xx postcodes — semicolon must not be URL-encoded), `offerType=2` (rent), `propertyType=100` (house or apartment — **required, API rejects `propertyType=0`**), `roomsMin` / `roomsMax` / `priceMin` / `priceMax` (server-side filtering), `rowCount=20`, `order=1` (newest first), `languageIso=de`. `totalResultCount` gives the total matching count. NewHome entries carry no publication timestamp, so its ordering can't be verified at runtime — it never early-exits (safe: no DataDome), but `order=1` ensures the `_MAX_PAGES`-capped scan covers the most recent listings.
 
 Entry fields: `immocode` (ID), `title`, `street` (includes house number), `city`, `postalCode`, `price` (gross rent CHF), `rooms`, `availabilityDate`.
 
@@ -150,7 +162,7 @@ Comparis.ch is a major Swiss comparison portal. Its real-estate section is a Nex
 
 **Important:** The old paths `/immobilien/marktplatz/suche/mieten?RegionId=...` (dead — 404 "Ups!") and `/immobilien/marktplatz/zuerich/wohnung/mieten?p=N` (ignores all filters server-side) are both wrong. The correct path is `/immobilien/result/list?requestobject={...}`. Pagination is via `&page=N` as a **separate URL parameter** (not inside the `requestobject` JSON).
 
-The `requestobject` JSON holds all filters: `DealType=10` (rent), `LocationSearchString="zurich"`, `RoomsFrom` (string, min rooms), `PriceFrom` / `PriceTo` (strings, CHF range), `Sort=11` (newest first). All filters are applied server-side — the response contains only matching listings.
+The `requestobject` JSON holds all filters: `DealType=10` (rent), `LocationSearchString="zurich"`, `RoomsFrom` (string, min rooms), `PriceFrom` / `PriceTo` (strings, CHF range), `Sort=3` (newest first — also mirrored as a top-level `&sort=3` param). **Gotcha:** `Sort=11` is *relevance*, not newest — its `Date` field comes back scrambled and trips the newest-first guard; use `Sort=3`. All filters are applied server-side — the response contains only matching listings.
 
 Key data fields: `AdId` (listing ID), `Title`, `PriceValue` (numeric CHF), `EssentialInformation` (["5.5 Zimmer", "3. OG", …] — rooms in index 0), `Address` (["8006 Zürich"] — postcode + city, no street). Detail URL: `/immobilien/marktplatz/details/show/{AdId}`.
 

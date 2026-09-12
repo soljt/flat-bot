@@ -68,7 +68,11 @@ def run_cycle(
 
     for adapter in adapters:
         try:
-            listings = adapter.search()
+            # Pass the seen-predicate so newest-first adapters can stop paginating
+            # once they reach already-seen listings (huge saving after the seed,
+            # and it keeps the browser from walking every page and tripping bot
+            # detection). A fresh store (first run / seed) simply never early-exits.
+            listings = adapter.search(is_seen=store.contains)
         except Exception:
             log.error(
                 "platform=%s action=adapter_failed",

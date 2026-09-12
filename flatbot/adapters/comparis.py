@@ -27,7 +27,7 @@ Search URL
     RoomsFrom            → minimum room count (string, e.g. "5")
     PriceFrom            → minimum rent CHF (string)
     PriceTo              → maximum rent CHF (string)
-    Sort=11              → newest first
+    Sort=3               → newest first (also pass top-level &sort=3)
 
   All filters are applied server-side. The SSR response for each page is in
   ``props.pageProps.initialResultData``:
@@ -78,12 +78,15 @@ import nodriver as uc
 _IN_DOCKER = os.path.exists("/.dockerenv")
 _CHROME_BIN = os.getenv("CHROME_EXECUTABLE_PATH") or None
 
+from collections.abc import Callable
+
 from .base import (
     Adapter,
     Listing,
     detect_no_wg,
     detect_price_on_request,
     detect_teaser_price,
+    page_all_seen,
 )
 
 log = logging.getLogger(__name__)
@@ -112,7 +115,7 @@ _BASE_REQUEST_OBJECT: dict = {
     "MinAvailableDate": "1753-01-01T00:00:00",
     "MinChangeDate": "1753-01-01T00:00:00",
     "LocationSearchString": "zurich",
-    "Sort": 11,              # newest first
+    "Sort": 3,               # newest first (Sort=11 is relevance, dates scrambled)
     "ShowComparisPoints": False,
     "HasBalcony": False,
     "HasTerrace": False,
@@ -140,6 +143,16 @@ _MAX_PAGES = 10
 _STATE_TIMEOUT_S = 50
 
 
+def _created_at(raw: dict) -> str | None:
+    """Creation timestamp from a raw Comparis item, or None.
+
+    Used to verify newest-first ordering (Sort=3) before trusting the early-exit.
+    Format is 'YYYY-MM-DDTHH:MM:SS' — sorts lexicographically.
+    """
+    val = raw.get("Date") if isinstance(raw, dict) else None
+    return val if isinstance(val, str) else None
+
+
 class ComparisAdapter(Adapter):
     name = "comparis"
 
@@ -154,9 +167,9 @@ class ComparisAdapter(Adapter):
         self._min_rent_chf = min_rent_chf
         self._max_rent_chf = max_rent_chf
 
-    def search(self) -> list[Listing]:
+    def search(self, is_seen: Callable[[str], bool] | None = None) -> list[Listing]:
         try:
-            return asyncio.run(self._async_search())
+            return asyncio.run(self._async_search(is_seen))
         except Exception as exc:
             log.error("platform=comparis action=search_failed error=%r", str(exc))
             return []
@@ -197,7 +210,9 @@ class ComparisAdapter(Adapter):
             browser.stop()
             await asyncio.sleep(0.5)
 
-    async def _async_search(self) -> list[Listing]:
+    async def _async_search(
+        self, is_seen: Callable[[str], bool] | None = None
+    ) -> list[Listing]:
         extra_args = ["--disable-dev-shm-usage"]
         if _IN_DOCKER:
             extra_args.append("--no-sandbox")
@@ -207,7 +222,7 @@ class ComparisAdapter(Adapter):
             browser_args=extra_args,
         )
         try:
-            return await self._fetch_pages(browser)
+            return await self._fetch_pages(browser, is_seen)
         finally:
             browser.stop()
             await asyncio.sleep(0.5)
@@ -218,7 +233,10 @@ class ComparisAdapter(Adapter):
         req["RoomsTo"] = None
         req["PriceFrom"] = str(int(self._min_rent_chf))
         req["PriceTo"] = str(int(self._max_rent_chf))
-        params: dict = {"requestobject": json.dumps(req, separators=(",", ":"))}
+        params: dict = {
+            "requestobject": json.dumps(req, separators=(",", ":")),
+            "sort": "3",  # top-level sort mirrors requestobject.Sort (newest first)
+        }
         if page > 0:
             params["page"] = str(page)
         return f"{_BASE_HOST}{_SEARCH_PATH}?{urlencode(params)}"
@@ -367,10 +385,14 @@ class ComparisAdapter(Adapter):
 
         return None
 
-    async def _fetch_pages(self, browser) -> list[Listing]:
+    async def _fetch_pages(
+        self, browser, is_seen: Callable[[str], bool] | None = None
+    ) -> list[Listing]:
         listings: list[Listing] = []
         tab = None
         _first_item_logged = False
+        newest_first = True       # verified per page via the item Date field
+        prev_page_oldest = None   # oldest Date seen on the previous page
 
         for page_num in range(_MAX_PAGES):
             url = self._build_url(page_num)
@@ -411,19 +433,42 @@ class ComparisAdapter(Adapter):
                     sample.get("Address"),
                 )
 
+            # Verify newest-first ordering (Sort=3) before trusting the early-exit.
+            created = sorted(c for c in (_created_at(r) for r in raw_items) if c)
+            if created:
+                if newest_first and prev_page_oldest is not None and created[-1] > prev_page_oldest:
+                    newest_first = False
+                    log.warning(
+                        "platform=comparis action=order_not_newest_first page=%d — "
+                        "disabling seen-based early-exit for this run",
+                        page_num,
+                    )
+                prev_page_oldest = created[0]
+
+            page_listings: list[Listing] = []
             for raw in raw_items:
                 try:
                     listing = _parse(raw)
                     if listing:
-                        listings.append(listing)
+                        page_listings.append(listing)
                 except Exception:
                     raw_id = raw.get("AdId", "?") if isinstance(raw, dict) else "?"
                     log.warning("platform=comparis action=item_parse_error id=%s", raw_id, exc_info=True)
+            listings.extend(page_listings)
 
             log.info(
                 "platform=comparis action=page_fetched page=%d/%d items=%d listings_so_far=%d",
                 page_num, page_count - 1, len(raw_items), len(listings),
             )
+
+            # Results are sorted newest-first (Sort=3), so once a whole page is
+            # already seen there is nothing new left on later pages.
+            if newest_first and page_all_seen(page_listings, is_seen):
+                log.info(
+                    "platform=comparis action=early_exit page=%d reason=all_seen count=%d",
+                    page_num, len(listings),
+                )
+                break
 
             if page_num >= page_count - 1:
                 break

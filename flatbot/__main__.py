@@ -83,7 +83,12 @@ def main() -> None:
         )
     if cfg.enable_homegate:
         adapters.append(
-            HomegateAdapter(min_rooms=cfg.min_rooms, max_rent_chf=cfg.max_rent_chf, session=session)
+            HomegateAdapter(
+                min_rooms=cfg.min_rooms,
+                min_rent_chf=cfg.min_rent_chf,
+                max_rent_chf=cfg.max_rent_chf,
+                session=session,
+            )
         )
     if cfg.enable_immoscout:
         adapters.append(

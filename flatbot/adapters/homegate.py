@@ -21,7 +21,13 @@ Search URL
   https://www.homegate.ch/rent/real-estate/city-zurich/matching-list
     ?ep=<page>   — page number (1-indexed)
     &ac=<rooms>  — minimum room count  (ac = Anzahl Zimmer)
-    &al=<price>  — maximum gross rent in CHF
+    &ag=<price>  — minimum gross rent in CHF
+    &ah=<price>  — maximum gross rent in CHF
+    &o=dateCreated-desc — sort newest-first (default is topListing/relevance)
+
+  NOTE: `al` is NOT price — it is the max living surface (m²). An earlier
+  version used `al` for max rent, so Homegate never actually price-filtered
+  (the pipeline's own filter masked it). Price is `ag`/`ah`.
 
 JSON shape (window.__INITIAL_STATE__)
 --------------------------------------
@@ -48,12 +54,15 @@ import nodriver as uc
 _IN_DOCKER = os.path.exists("/.dockerenv")
 _CHROME_BIN = os.getenv("CHROME_EXECUTABLE_PATH") or None
 
+from collections.abc import Callable
+
 from .base import (
     Adapter,
     Listing,
     detect_no_wg,
     detect_price_on_request,
     detect_teaser_price,
+    page_all_seen,
 )
 
 log = logging.getLogger(__name__)
@@ -66,6 +75,18 @@ _MAX_PAGES = 10
 _STATE_TIMEOUT_S = 30  # seconds to wait for __INITIAL_STATE__ per page
 
 
+def _created_at(raw: dict) -> str | None:
+    """Publication timestamp (ISO8601-Z) from a raw Homegate listing, or None.
+
+    Used only to verify that the result set is ordered newest-first before we
+    trust the seen-based early-exit. ISO8601-Z strings sort lexicographically.
+    """
+    lst = raw.get("listing") or raw
+    meta = lst.get("meta") if isinstance(lst, dict) else None
+    val = (meta or {}).get("createdAt")
+    return val if isinstance(val, str) else None
+
+
 class HomegateAdapter(Adapter):
     name = "homegate"
 
@@ -73,14 +94,16 @@ class HomegateAdapter(Adapter):
         self,
         min_rooms: float,
         max_rent_chf: float,
+        min_rent_chf: float = 0.0,
         session=None,  # kept for interface compatibility; not used
     ) -> None:
         self._min_rooms = min_rooms
+        self._min_rent_chf = min_rent_chf
         self._max_rent_chf = max_rent_chf
 
-    def search(self) -> list[Listing]:
+    def search(self, is_seen: Callable[[str], bool] | None = None) -> list[Listing]:
         try:
-            return asyncio.run(self._async_search())
+            return asyncio.run(self._async_search(is_seen))
         except Exception as exc:
             log.error("platform=homegate action=search_failed error=%r", str(exc))
             return []
@@ -112,7 +135,9 @@ class HomegateAdapter(Adapter):
             browser.stop()
             await asyncio.sleep(0.5)
 
-    async def _async_search(self) -> list[Listing]:
+    async def _async_search(
+        self, is_seen: Callable[[str], bool] | None = None
+    ) -> list[Listing]:
         extra_args = ["--disable-dev-shm-usage"]
         if _IN_DOCKER:
             extra_args.append("--no-sandbox")
@@ -122,7 +147,7 @@ class HomegateAdapter(Adapter):
             browser_args=extra_args,
         )
         try:
-            return await self._fetch_pages(browser)
+            return await self._fetch_pages(browser, is_seen)
         finally:
             browser.stop()
             # Let the event loop drain subprocess transports before asyncio.run()
@@ -131,9 +156,14 @@ class HomegateAdapter(Adapter):
 
     def _build_url(self, page: int) -> str:
         params = {
-            "ep": str(page),
-            "ac": str(math.floor(self._min_rooms)),
-            "al": str(int(self._max_rent_chf)),
+            "ep": str(page),                        # page number (1-indexed)
+            "ac": str(math.floor(self._min_rooms)),  # min rooms (Anzahl Zimmer)
+            "ag": str(int(self._min_rent_chf)),     # min gross rent CHF
+            "ah": str(int(self._max_rent_chf)),     # max gross rent CHF
+            # Sort newest-first so the seen-based early-exit is valid. Without
+            # this Homegate defaults to sortType=topListing (promoted/relevance),
+            # whose createdAt order is scrambled and trips the newest-first guard.
+            "o": "dateCreated-desc",
         }
         return f"{_BASE_SEARCH_URL}?{urlencode(params)}"
 
@@ -161,9 +191,13 @@ class HomegateAdapter(Adapter):
             await asyncio.sleep(1)
         return None
 
-    async def _fetch_pages(self, browser) -> list[Listing]:
+    async def _fetch_pages(
+        self, browser, is_seen: Callable[[str], bool] | None = None
+    ) -> list[Listing]:
         listings: list[Listing] = []
         tab = None
+        newest_first = True       # verified per page via meta.createdAt
+        prev_page_oldest = None   # oldest createdAt seen on the previous page
 
         for page_num in range(1, _MAX_PAGES + 1):
             url = self._build_url(page_num)
@@ -189,11 +223,27 @@ class HomegateAdapter(Adapter):
                 break
 
             raw_listings, page_count = result
+
+            # Verify newest-first ordering before trusting the early-exit: if a
+            # later page carries a listing newer than the previous page's oldest,
+            # the results are not newest-first and early-exit would skip new flats.
+            created = sorted(c for c in (_created_at(r) for r in raw_listings) if c)
+            if created:
+                if newest_first and prev_page_oldest is not None and created[-1] > prev_page_oldest:
+                    newest_first = False
+                    log.warning(
+                        "platform=homegate action=order_not_newest_first page=%d — "
+                        "disabling seen-based early-exit for this run",
+                        page_num,
+                    )
+                prev_page_oldest = created[0]
+
+            page_listings: list[Listing] = []
             for raw in raw_listings:
                 try:
                     listing = _parse(raw)
                     if listing:
-                        listings.append(listing)
+                        page_listings.append(listing)
                 except Exception:
                     raw_id = (raw.get("listing") or raw).get("id", "?")
                     log.warning(
@@ -201,11 +251,19 @@ class HomegateAdapter(Adapter):
                         raw_id,
                         exc_info=True,
                     )
+            listings.extend(page_listings)
 
             log.info(
                 "platform=homegate action=page_fetched page=%d/%d listings_so_far=%d",
                 page_num, page_count, len(listings),
             )
+
+            if newest_first and page_all_seen(page_listings, is_seen):
+                log.info(
+                    "platform=homegate action=early_exit page=%d reason=all_seen count=%d",
+                    page_num, len(listings),
+                )
+                break
 
             if page_num >= page_count:
                 break

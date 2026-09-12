@@ -1,5 +1,6 @@
 .env
 .env.mycopy
+*.mycopy
 profile.toml
 profile.toml.mycopy
 service-account.json
