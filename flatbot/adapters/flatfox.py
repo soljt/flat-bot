@@ -20,12 +20,15 @@ import time
 
 import httpx
 
+from collections.abc import Callable
+
 from .base import (
     Adapter,
     Listing,
     detect_no_wg,
     detect_price_on_request,
     detect_teaser_price,
+    page_all_seen,
 )
 
 log = logging.getLogger(__name__)
@@ -61,13 +64,18 @@ class FlatfoxAdapter(Adapter):
             follow_redirects=True,
         )
 
-    def search(self) -> list[Listing]:
+    def search(self, is_seen: Callable[[str], bool] | None = None) -> list[Listing]:
         pks = self._fetch_pks()
         if not pks:
             log.info("platform=flatfox action=no_pins_returned")
             return []
 
-        listings = self._fetch_listings(pks)
+        # Sort descending so the highest (newest) PKs are fetched first. This
+        # makes the batches newest-first, which is what lets the seen-based
+        # early-exit stop as soon as it reaches already-seen listings.
+        pks = sorted(pks, reverse=True)
+
+        listings = self._fetch_listings(pks, is_seen)
         log.info("platform=flatfox action=fetched count=%d", len(listings))
         return listings
 
@@ -99,7 +107,9 @@ class FlatfoxAdapter(Adapter):
         log.info("platform=flatfox action=pins_fetched count=%d", len(pks))
         return pks
 
-    def _fetch_listings(self, pks: list[int]) -> list[Listing]:
+    def _fetch_listings(
+        self, pks: list[int], is_seen: Callable[[str], bool] | None = None
+    ) -> list[Listing]:
         listings: list[Listing] = []
 
         for batch_start in range(0, len(pks), _BATCH_SIZE):
@@ -120,17 +130,28 @@ class FlatfoxAdapter(Adapter):
                 break
 
             results = data.get("results", []) if isinstance(data, dict) else []
+            batch_listings: list[Listing] = []
             for item in results:
                 try:
                     listing = _parse(item)
                     if listing:
-                        listings.append(listing)
+                        batch_listings.append(listing)
                 except Exception:
                     log.warning(
                         "platform=flatfox action=item_parse_error id=%s",
                         item.get("pk", "?"),
                         exc_info=True,
                     )
+            listings.extend(batch_listings)
+
+            # Batches are newest-first (PKs sorted descending); once a full batch
+            # is already seen there is nothing new left in the older PKs.
+            if page_all_seen(batch_listings, is_seen):
+                log.info(
+                    "platform=flatfox action=early_exit batch_start=%d reason=all_seen count=%d",
+                    batch_start, len(listings),
+                )
+                break
 
             if batch_start + _BATCH_SIZE < len(pks):
                 time.sleep(random.uniform(1.0, 2.5))

@@ -70,15 +70,30 @@ import nodriver as uc
 _IN_DOCKER = os.path.exists("/.dockerenv")
 _CHROME_BIN = os.getenv("CHROME_EXECUTABLE_PATH") or None
 
+from collections.abc import Callable
+
 from .base import (
     Adapter,
     Listing,
     detect_no_wg,
     detect_price_on_request,
     detect_teaser_price,
+    page_all_seen,
 )
 
 log = logging.getLogger(__name__)
+
+
+def _created_at(raw: dict) -> str | None:
+    """Publication timestamp (ISO8601-Z) from a raw IS24 listing, or None.
+
+    Same SMG schema as Homegate. Used only to verify newest-first ordering
+    before trusting the seen-based early-exit. ISO8601-Z sorts lexicographically.
+    """
+    lst = raw.get("listing") or raw
+    meta = lst.get("meta") if isinstance(lst, dict) else None
+    val = (meta or {}).get("createdAt")
+    return val if isinstance(val, str) else None
 
 _BASE_URL = "https://www.immoscout24.ch/en/real-estate/rent/city-zurich"
 _BASE_HOST = "https://www.immoscout24.ch"
@@ -101,9 +116,9 @@ class ImmoScout24Adapter(Adapter):
         self._min_rent_chf = min_rent_chf
         self._max_rent_chf = max_rent_chf
 
-    def search(self) -> list[Listing]:
+    def search(self, is_seen: Callable[[str], bool] | None = None) -> list[Listing]:
         try:
-            return asyncio.run(self._async_search())
+            return asyncio.run(self._async_search(is_seen))
         except Exception as exc:
             log.error("platform=immoscout24 action=search_failed error=%r", str(exc))
             return []
@@ -135,7 +150,9 @@ class ImmoScout24Adapter(Adapter):
             browser.stop()
             await asyncio.sleep(0.5)
 
-    async def _async_search(self) -> list[Listing]:
+    async def _async_search(
+        self, is_seen: Callable[[str], bool] | None = None
+    ) -> list[Listing]:
         extra_args = ["--disable-dev-shm-usage"]
         if _IN_DOCKER:
             extra_args.append("--no-sandbox")
@@ -145,7 +162,7 @@ class ImmoScout24Adapter(Adapter):
             browser_args=extra_args,
         )
         try:
-            return await self._fetch_pages(browser)
+            return await self._fetch_pages(browser, is_seen)
         finally:
             browser.stop()
             await asyncio.sleep(0.5)
@@ -156,6 +173,10 @@ class ImmoScout24Adapter(Adapter):
             "pf": str(int(self._min_rent_chf)), # price from (min rent CHF)
             "pt": str(int(self._max_rent_chf)), # price to (max rent CHF)
             "pn": str(page),                    # page number (1-indexed)
+            # Sort newest-first (same SMG param as Homegate) so the seen-based
+            # early-exit is valid; otherwise IS24 defaults to a promoted/relevance
+            # order whose createdAt is scrambled and trips the newest-first guard.
+            "o": "dateCreated-desc",
         }
         return f"{_BASE_URL}?{urlencode(params)}"
 
@@ -295,10 +316,14 @@ class ImmoScout24Adapter(Adapter):
 
         return None
 
-    async def _fetch_pages(self, browser) -> list[Listing]:
+    async def _fetch_pages(
+        self, browser, is_seen: Callable[[str], bool] | None = None
+    ) -> list[Listing]:
         listings: list[Listing] = []
         tab = None
         _first_listing_logged = False
+        newest_first = True       # verified per page via meta.createdAt
+        prev_page_oldest = None   # oldest createdAt seen on the previous page
 
         for page_num in range(1, _MAX_PAGES + 1):
             url = self._build_url(page_num)
@@ -315,7 +340,9 @@ class ImmoScout24Adapter(Adapter):
                 break
 
             # Wait for client-side data to load; IS24 fetches listings via XHR.
-            await asyncio.sleep(8)
+            # Jittered (not a fixed 8s) so the navigation cadence looks less
+            # robotic to DataDome across the multi-page walk.
+            await asyncio.sleep(random.uniform(7.0, 11.0))
 
             result = await self._wait_for_state(tab)
             if result is None:
@@ -343,11 +370,24 @@ class ImmoScout24Adapter(Adapter):
                     sample.get("address"),
                 )
 
+            # Verify newest-first ordering before trusting the early-exit.
+            created = sorted(c for c in (_created_at(r) for r in raw_listings) if c)
+            if created:
+                if newest_first and prev_page_oldest is not None and created[-1] > prev_page_oldest:
+                    newest_first = False
+                    log.warning(
+                        "platform=immoscout24 action=order_not_newest_first page=%d — "
+                        "disabling seen-based early-exit for this run",
+                        page_num,
+                    )
+                prev_page_oldest = created[0]
+
+            page_listings: list[Listing] = []
             for raw in raw_listings:
                 try:
                     listing = _parse(raw)
                     if listing:
-                        listings.append(listing)
+                        page_listings.append(listing)
                 except Exception:
                     raw_id = raw.get("id", "?") if isinstance(raw, dict) else "?"
                     log.warning(
@@ -355,11 +395,19 @@ class ImmoScout24Adapter(Adapter):
                         raw_id,
                         exc_info=True,
                     )
+            listings.extend(page_listings)
 
             log.info(
                 "platform=immoscout24 action=page_fetched page=%d/%d listings_so_far=%d",
                 page_num, page_count, len(listings),
             )
+
+            if newest_first and page_all_seen(page_listings, is_seen):
+                log.info(
+                    "platform=immoscout24 action=early_exit page=%d reason=all_seen count=%d",
+                    page_num, len(listings),
+                )
+                break
 
             if page_num >= page_count:
                 break

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass
 
 _NO_WG_KW = [
@@ -71,11 +72,32 @@ class Listing:
         return f"{self.platform}:{self.id}"
 
 
+def page_all_seen(
+    listings: list[Listing], is_seen: Callable[[str], bool] | None
+) -> bool:
+    """True when *is_seen* is provided and every listing on the page is already seen.
+
+    Adapters that paginate newest-first use this to stop early: once a whole
+    page is already seen, everything after it is older and also seen, so there
+    is nothing new left to fetch.
+    """
+    return is_seen is not None and bool(listings) and all(is_seen(l.uid) for l in listings)
+
+
 class Adapter(ABC):
     name: str
 
     @abstractmethod
-    def search(self) -> list[Listing]:
+    def search(self, is_seen: Callable[[str], bool] | None = None) -> list[Listing]:
+        """Return the current listings for this platform.
+
+        When *is_seen* is provided (a ``uid -> bool`` predicate), adapters that
+        fetch newest-first may stop paginating as soon as a full page is already
+        seen — this keeps steady-state cycles to roughly one page and avoids
+        tripping bot-detection by walking the entire result set every cycle.
+        On the first run / seed (nothing seen yet) the full result set up to the
+        page cap is fetched. When *is_seen* is None, no early-exit is applied.
+        """
         ...
 
     def get_available_from(self, url: str) -> str | None:
