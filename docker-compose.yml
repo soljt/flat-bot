@@ -22,6 +22,9 @@ services:
       - MATCH_STORE_PATH=/app/data/matches.jsonl
     volumes:
       - ./data:/app/data
+      # Persona / message profile (see profile.toml.example). Create profile.toml
+      # before starting, or the bot falls back to a neutral built-in profile.
+      - ./profile.toml:/app/profile.toml:ro
       # Optional: mount Google service account key if GOOGLE_SERVICE_ACCOUNT_JSON is set
       # - ./service-account.json:/app/service-account.json:ro
     restart: unless-stopped

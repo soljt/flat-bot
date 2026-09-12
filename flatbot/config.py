@@ -5,6 +5,8 @@ from dataclasses import dataclass, field
 
 from dotenv import load_dotenv
 
+from .profile import Profile, default_profile, load_profile
+
 load_dotenv()
 
 
@@ -32,6 +34,10 @@ class Config:
     # Poll schedule
     poll_interval_min: int = 15
     poll_jitter_min: int = 5
+
+    # Email persona / message profile (loaded from a gitignored TOML file)
+    profile: Profile = field(default_factory=default_profile)
+    profile_path: str = "profile.toml"
 
     # Google Sheets (optional)
     google_sheets_id: str = ""
@@ -70,6 +76,8 @@ def load_config() -> Config:
     if missing:
         raise ValueError(f"Required env vars not set: {', '.join(missing)}")
 
+    profile_path = os.getenv("PROFILE_PATH", "profile.toml")
+
     return Config(
         anthropic_api_key=anthropic_key,
         resend_api_key=resend_key,
@@ -86,6 +94,8 @@ def load_config() -> Config:
         enable_comparis=os.getenv("ENABLE_COMPARIS", "true").lower() == "true",
         poll_interval_min=int(os.getenv("POLL_INTERVAL_MIN", "15")),
         poll_jitter_min=int(os.getenv("POLL_JITTER_MIN", "5")),
+        profile=load_profile(profile_path),
+        profile_path=profile_path,
         google_sheets_id=os.getenv("GOOGLE_SHEETS_ID", ""),
         google_service_account_json=os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON", ""),
         flaresolverr_url=os.getenv("FLARESOLVERR_URL", "http://localhost:8191/v1"),

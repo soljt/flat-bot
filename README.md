@@ -48,11 +48,12 @@ Flatbot runs continuously in Docker (or on a Raspberry Pi), normalises listings 
 flatbot/
 ├── __main__.py          # CLI entry point — wires adapters, stores, and pipeline
 ├── config.py            # Env-var config with typed dataclass and defaults
+├── profile.py           # Loads the gitignored persona/message profile (profile.toml)
 ├── pipeline.py          # Core loop: fetch → filter → dedup → notify
 ├── store.py             # Append-only seen-ID file (seen.txt)
 ├── matchstore.py        # Cross-platform dedup store (matches.jsonl)
 ├── notifier.py          # Resend email sender (HTML + plaintext fallback)
-├── llm.py               # Anthropic API for email generation; template fallback
+├── llm.py               # Anthropic API for email generation; profile-driven, template fallback
 ├── sheets.py            # Optional Google Sheets match log
 ├── logging_setup.py     # Structured stdout logging
 └── adapters/
@@ -108,7 +109,8 @@ Each platform has a different protection stack; flatbot picks the right transpor
 git clone https://github.com/soljt/flat-bot.git
 cd flat-bot
 uv sync
-cp .env.example .env   # fill in keys (see Configuration)
+cp .env.example .env             # fill in keys (see Configuration)
+cp profile.toml.example profile.toml   # fill in your persona / message (see Configuration)
 
 # Start FlareSolverr (required for Homegate and ImmoScout24)
 docker compose up -d flaresolverr
@@ -145,6 +147,7 @@ Two Chrome windows open briefly per cycle (Homegate + ImmoScout24/Comparis run s
 
 ```bash
 cp .env.example .env
+cp profile.toml.example profile.toml   # required: bind-mounted into the container
 docker compose up -d        # builds flatbot + starts flaresolverr
 
 docker compose logs -f flatbot
@@ -188,6 +191,7 @@ All settings via environment variables or a `.env` file.
 | `ENABLE_COMPARIS` | `true` | Toggle Comparis.ch adapter |
 | `POLL_INTERVAL_MIN` | `15` | Minutes between cycles |
 | `POLL_JITTER_MIN` | `5` | Random ± jitter added to interval |
+| `PROFILE_PATH` | `profile.toml` | Path to the persona/message profile (see below) |
 | `FLARESOLVERR_URL` | `http://localhost:8191/v1` | FlareSolverr endpoint |
 | `FLARESOLVERR_MAX_TIMEOUT_MS` | `60000` | CF challenge timeout |
 | `SEEN_STORE_PATH` | `seen.txt` | Persistent seen-IDs file |
@@ -197,6 +201,27 @@ All settings via environment variables or a `.env` file.
 | `CHROME_EXECUTABLE_PATH` | _(auto)_ | Override Chromium binary path |
 
 See `.env.example` for a ready-to-fill template. Google Sheets setup: see `SHEETS_SETUP.md`.
+
+> **Note:** the search city is **Zürich**, hardcoded in each adapter (bounding box / city slug / location ID). `POSTCODE_PREFIX` only filters the fetched Zürich results — searching a different city requires editing the adapters.
+
+### Personalising the emails (`profile.toml`)
+
+Everything about *who is searching* — the email subject brand, a short description of the applicants, the contact name, and the German message the LLM adapts for each landlord — lives in a gitignored `profile.toml`, not in code. This keeps the repo reusable: each person clones it and drops in their own profile.
+
+```bash
+cp profile.toml.example profile.toml   # then edit with your details
+```
+
+If `profile.toml` is missing, the bot falls back to a neutral built-in profile and logs a warning (emails still send, just generically). The fields are documented inline in `profile.toml.example`:
+
+| Field | Purpose |
+|---|---|
+| `subject_prefix` | Text at the start of every email subject line |
+| `group_description` | 1–2 sentences on who is applying (injected into the LLM prompt) |
+| `contact_name` | A real name the LLM may use in the message; empty keeps the `[Ihr Name]` placeholder |
+| `message_template` | The German message the LLM adapts per landlord; keep `[bracketed]` placeholders to fill by hand |
+| `fallback_message` | Static plain-text message used verbatim if the LLM call fails |
+| `extra_instructions` | Optional extra guidance appended to the LLM instructions |
 
 ---
 

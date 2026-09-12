@@ -1,0 +1,57 @@
+# ── Flatbot email persona / message profile ────────────────────────────────
+#
+# Copy this file to `profile.toml` (gitignored) and fill in your own details.
+# Everything here is personal to whoever is running the bot and is used only to
+# generate the notification emails — the bot never sends anything to a landlord
+# itself. The suggested message is written for YOU to copy, adapt, and send.
+#
+# The file is TOML. Use triple-quoted """ ... """ blocks for multi-line text.
+
+# Prefix shown at the start of every email subject line.
+subject_prefix = "Flatbot: "
+
+# One or two sentences describing who is applying. This is injected into the
+# prompt so the generated German message reflects the real applicants (a single
+# person, a couple, a group of friends, a family, ...). Write it however you'd
+# describe yourselves to a landlord.
+group_description = """
+We are a young working professional (or: couple / group of friends) looking for
+a long-term flat to rent in Zurich. Reliable tenants with stable employment.
+"""
+
+# A real name the LLM may use in the greeting / sign-off of the message.
+# Leave empty ("") to keep the [Ihr Name] placeholder for you to fill by hand.
+contact_name = "Your Name"
+
+# Optional extra guidance appended to the LLM instructions (tone, do's & don'ts).
+# Leave empty ("") if you have none.
+extra_instructions = ""
+
+# The German message the LLM adapts for each landlord. Keep any [bracketed]
+# placeholders you want to fill in by hand before sending (e.g. [Telefonnummer]).
+# The LLM adjusts the greeting to the landlord's name and may weave in one
+# specific detail about the flat, but otherwise stays close to this text.
+message_template = """
+Guten Tag [Anrede],
+
+wir interessieren uns sehr für die Wohnung an der [Adresse] und würden sie gerne besichtigen.
+
+Wir sind zuverlässige Mieter mit stabiler Anstellung und würden uns freuen, uns persönlich vorstellen zu dürfen. Zeitlich sind wir flexibel und könnten [Einzugsdatum] einziehen.
+Wäre es möglich, einen Besichtigungstermin zu vereinbaren? Wir richten uns ganz nach Ihrer Verfügbarkeit.
+
+Vielen Dank für Ihre Zeit, wir freuen uns auf Ihre Rückmeldung.
+Freundliche Grüsse,
+[Ihr Name]
+[Telefonnummer]
+"""
+
+# Static message used verbatim when the LLM call fails (network error, etc.).
+# Plain text; blank lines separate paragraphs.
+fallback_message = """
+Guten Tag [Anrede],
+
+wir sind auf Ihre Wohnung gestossen und interessieren uns sehr dafür. Sind noch Besichtigungstermine verfügbar?
+
+Freundliche Grüsse,
+[Ihr Name]
+"""

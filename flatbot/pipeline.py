@@ -170,7 +170,9 @@ def run_cycle(
                 continue
 
             # ── Normal notify path ────────────────────────────────────────
-            subject, body = generate_email(listing, cfg.anthropic_api_key, _sheets_url(cfg))
+            subject, body = generate_email(
+                listing, cfg.anthropic_api_key, cfg.profile, _sheets_url(cfg)
+            )
 
             try:
                 notifier.send(

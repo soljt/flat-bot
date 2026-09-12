@@ -30,10 +30,11 @@ docker buildx build \
 echo "==> Saving image and streaming to Pi..."
 docker save "$IMAGE" | ssh "$PI" "docker load"
 
-echo "==> Copying compose file and .env to Pi..."
+echo "==> Copying compose file, .env, and profile.toml to Pi..."
 ssh "$PI" "mkdir -p $REMOTE_DIR"
 scp docker-compose.yml "$PI:$REMOTE_DIR/docker-compose.yml"
 scp .env "$PI:$REMOTE_DIR/.env"
+scp profile.toml "$PI:$REMOTE_DIR/profile.toml"
 
 echo "==> Restarting services on Pi..."
 ssh "$PI" "cd $REMOTE_DIR && docker compose up -d"

@@ -10,11 +10,12 @@ Notify-first flat-match bot for Zurich. Polls Flatfox and Homegate on a configur
 flatbot/
 ├── __main__.py          # CLI entry point, wires everything together
 ├── config.py            # Env-var config, all settings with defaults
+├── profile.py           # Loads the gitignored persona/message profile (profile.toml)
 ├── pipeline.py          # Main loop: fetch → filter → deduplicate → notify
 ├── store.py             # Append-only seen-ID file (seen.txt)
 ├── matchstore.py        # Cross-platform dedup store (matches.jsonl)
 ├── notifier.py          # Resend email sender (HTML + plaintext fallback)
-├── llm.py               # Anthropic API for email subject/body, template fallback
+├── llm.py               # Anthropic API for email subject/body, profile-driven, template fallback
 ├── sheets.py            # Optional Google Sheets match log
 ├── logging_setup.py     # Structured stdout logging
 └── adapters/
@@ -178,6 +179,7 @@ All settings read from env vars or `.env`. Defaults shown below.
 | `ENABLE_COMPARIS` | `true` | Toggle Comparis.ch adapter |
 | `POLL_INTERVAL_MIN` | `15` | Minutes between cycles |
 | `POLL_JITTER_MIN` | `5` | ± random jitter in minutes |
+| `PROFILE_PATH` | `profile.toml` | Path to the gitignored persona/message profile (see below) |
 | `FLARESOLVERR_URL` | `http://localhost:8191/v1` | Overridden to `http://flaresolverr:8191/v1` in Docker |
 | `FLARESOLVERR_MAX_TIMEOUT_MS` | `60000` | CF challenge timeout |
 | `SEEN_STORE_PATH` | `seen.txt` | Set to `/app/data/seen.txt` in Docker |
@@ -186,12 +188,23 @@ All settings read from env vars or `.env`. Defaults shown below.
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | _(empty)_ | Path to service account key |
 | `CHROME_EXECUTABLE_PATH` | _(auto)_ | Override Chromium binary (set in Docker) |
 
+### Persona / message profile (`profile.py` + `profile.toml`)
+
+All searcher-specific email content lives in a gitignored `profile.toml`, loaded by `profile.py` into a `Profile` dataclass on `cfg.profile`. This keeps the repo reusable — no personal identity is hardcoded in `llm.py`. Fields: `subject_prefix`, `group_description` (injected into the LLM prompt), `contact_name` (a name the LLM may use), `message_template` (the German base message), `fallback_message` (used verbatim if the LLM call fails), and `extra_instructions`.
+
+- Parsed with stdlib `tomllib` (no new deps). Missing file / read error / bad TOML → falls back to a neutral built-in `default_profile()` and logs a warning (the bot still runs, emails are just generic).
+- `llm.py` builds the prompt from the profile; the generic instructions ("no em dashes", "don't sound like an AI", plain-text output) stay in code.
+- Committed template: `profile.toml.example`. In Docker, `profile.toml` is **bind-mounted** (see `docker-compose.yml`); `ship-to-pi.sh` scp's it to the Pi.
+
+**Search geography is hardcoded to Zürich** in every adapter (Flatfox lat/long bbox, Homegate/ImmoScout `city-zurich`, NewHome `location=1;2560`, Comparis `LocationSearchString="zurich"`). `POSTCODE_PREFIX` only filters the fetched Zürich results — it does **not** change the city. Searching elsewhere requires editing the adapters, not config.
+
 ---
 
 ## Running locally
 
 ```bash
 uv sync
+cp profile.toml.example profile.toml   # then edit with your persona / message
 
 # Start FlareSolverr (required for Homegate)
 docker compose up -d flaresolverr
@@ -218,6 +231,7 @@ Two Chrome windows will appear briefly during each cycle — one for the Homegat
 
 ```bash
 cp .env.example .env   # fill in your keys
+cp profile.toml.example profile.toml   # required: bind-mounted into the container
 
 # Build and start both services
 docker compose up -d
@@ -241,7 +255,7 @@ Store files (`seen.txt`, `matches.jsonl`) are persisted in `./data/` on the host
 ./scripts/ship-to-pi.sh pi@raspberrypi.local
 ```
 
-The script builds an arm64 image, streams it to the Pi, copies `.env` and `docker-compose.yml`, and restarts the stack. Tested on Pi 4/5 (arm64). Minimum recommended: Pi 4 with 4 GB RAM (FlareSolverr + nodriver Chrome both keep browsers in memory).
+The script builds an arm64 image, streams it to the Pi, copies `.env`, `docker-compose.yml`, and `profile.toml`, and restarts the stack. Tested on Pi 4/5 (arm64). Minimum recommended: Pi 4 with 4 GB RAM (FlareSolverr + nodriver Chrome both keep browsers in memory).
 
 ---
 
