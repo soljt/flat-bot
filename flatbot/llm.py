@@ -7,15 +7,18 @@ import re
 import anthropic
 
 from .adapters.base import Listing
+from .profile import Profile, default_profile
 
 log = logging.getLogger(__name__)
 
 _MODEL = "claude-haiku-4-5-20251001"
-_SUBJECT_PREFIX = "Spikeboys Flatbot: "
 
 
 def generate_email(
-    listing: Listing, api_key: str, sheets_url: str | None = None
+    listing: Listing,
+    api_key: str,
+    profile: Profile | None = None,
+    sheets_url: str | None = None,
 ) -> tuple[str, str]:
     """
     Return (subject, html_body).
@@ -23,24 +26,33 @@ def generate_email(
     Subject is always deterministic (rooms / postcode / price).
     The HTML body is a deterministic template; the LLM is called only to
     write the suggested landlord message, which it returns as plain text.
+    *profile* supplies the searcher-specific persona and message template;
+    the neutral default is used when it is None.
     Pass *sheets_url* to include a coordination note with a link to the
     match-tracking Google Sheet before the suggested landlord message.
     """
-    subject = fallback_subject(listing)
-    landlord_msg = _get_landlord_message(listing, api_key)
+    profile = profile or default_profile()
+    subject = fallback_subject(listing, profile)
+    landlord_msg = _get_landlord_message(listing, api_key, profile)
     body = _render_email_body(listing, landlord_msg, sheets_url)
     return subject, body
 
 
 # ── Public fallbacks (used by tests and by generate_email error path) ─────────
 
-def fallback_subject(listing: Listing) -> str:
+def fallback_subject(listing: Listing, profile: Profile | None = None) -> str:
+    profile = profile or default_profile()
     price = _price_str(listing)
-    return f"{_SUBJECT_PREFIX}{listing.rooms or '?'}R {listing.postcode or 'Zürich'} — {price}"
+    return f"{profile.subject_prefix}{listing.rooms or '?'}R {listing.postcode or 'Zürich'} — {price}"
 
 
-def fallback_body(listing: Listing, sheets_url: str | None = None) -> str:
-    return _render_email_body(listing, _fallback_landlord_message(), sheets_url)
+def fallback_body(
+    listing: Listing,
+    sheets_url: str | None = None,
+    profile: Profile | None = None,
+) -> str:
+    profile = profile or default_profile()
+    return _render_email_body(listing, _fallback_landlord_message(profile), sheets_url)
 
 
 # ── Email body template ───────────────────────────────────────────────────────
@@ -100,10 +112,10 @@ def _render_email_body(
 
 # ── Landlord message ──────────────────────────────────────────────────────────
 
-def _get_landlord_message(listing: Listing, api_key: str) -> str:
+def _get_landlord_message(listing: Listing, api_key: str, profile: Profile) -> str:
     """Try LLM for the landlord message; fall back to the template on any failure."""
     try:
-        return _llm_landlord_message(listing, api_key)
+        return _llm_landlord_message(listing, api_key, profile)
     except Exception:
         log.warning(
             "platform=%s action=llm_landlord_failed id=%s — using template",
@@ -111,18 +123,32 @@ def _get_landlord_message(listing: Listing, api_key: str) -> str:
             listing.id,
             exc_info=True,
         )
-        return _fallback_landlord_message()
+        return _fallback_landlord_message(profile)
 
 
-def _llm_landlord_message(listing: Listing, api_key: str) -> str:
+def _llm_landlord_message(listing: Listing, api_key: str, profile: Profile) -> str:
     """
     Ask the LLM to write the suggested landlord message as plain text.
-    Converts the result to HTML paragraphs.
+    The persona and base template come from the profile; converts the result
+    to HTML paragraphs.
     """
     price_str = _price_str(listing)
-    prompt = f"""Write a suggested German-language message from our group to the landlord for this flat listing.
 
-We are "Spikeboys" — 4 friends, 25–30 years old, all ETH graduates now working in the tech industry, looking for a flat in Zurich together.
+    instructions = (
+        "Base the message closely on this template. Adapt the greeting if the "
+        "landlord's name appears in the listing. Naturally weave in one brief, "
+        "specific detail about the flat if something stands out — otherwise keep "
+        "it close to the template. Do not use em dashes or this character: '—'. "
+        "Try not to sound like an AI."
+    )
+    if profile.contact_name:
+        instructions += f" You may provide the name {profile.contact_name}."
+    if profile.extra_instructions.strip():
+        instructions += " " + profile.extra_instructions.strip()
+
+    prompt = f"""Write a suggested German-language message to the landlord for this flat listing, on behalf of the people described below.
+
+{profile.group_description.strip()}
 
 LISTING:
 Title: {listing.title}
@@ -132,16 +158,10 @@ Rent: {price_str}
 Available from: {listing.available_from or 'not specified'}
 Description excerpt: {listing.description[:400]}
 
-Base the message closely on this template. Adapt the greeting if the landlord's name appears in the listing. Naturally weave in one brief, specific detail about the flat if something stands out — otherwise keep it close to the template.
+{instructions}
 
 ---
-Guten Tag [Anrede],
-
-Ich bin gerade auf dieses Objekt gestossen und es erfüllt genau unsere Anforderungen. Wir sind 4 befreundete junge Erwachsene (25–30 Jahre alt), alle ETH Absolventen die jetzt in der Tech-Branche tätig sind, und suchen jetzt gemeinsam nach einer permanenten Bleibe in Zürich. Unser vollständiges Dossier finden Sie im Anhang.
-Sind noch Besichtigungstermine verfügbar? Wir könnten die Wohnung direkt bestätigen.
-
-Beste Grüsse,
-[Ihr Name]
+{profile.message_template.strip()}
 ---
 
 Respond with ONLY the message text. Plain text, blank lines between paragraphs (greeting / body / sign-off). No HTML, no explanation, nothing else."""
@@ -156,16 +176,9 @@ Respond with ONLY the message text. Plain text, blank lines between paragraphs (
     return _plain_text_to_html(plain_text)
 
 
-def _fallback_landlord_message() -> str:
-    return (
-        "<p>Guten Tag [Anrede],</p>\n\n"
-        "<p>Ich bin gerade auf dieses Objekt gestossen und es erfüllt genau unsere Anforderungen. "
-        "Wir sind 4 befreundete junge Erwachsene (25–30 Jahre alt), alle ETH Absolventen die jetzt "
-        "in der Tech-Branche tätig sind, und suchen jetzt gemeinsam nach einer permanenten Bleibe "
-        "in Zürich. Unser vollständiges Dossier finden Sie im Anhang.<br>\n"
-        "Sind noch Besichtigungstermine verfügbar? Wir könnten die Wohnung direkt bestätigen.</p>\n\n"
-        "<p>Beste Grüsse,<br>\n[Ihr Name]</p>"
-    )
+def _fallback_landlord_message(profile: Profile) -> str:
+    """The static message used verbatim when the LLM call fails."""
+    return _plain_text_to_html(profile.fallback_message)
 
 
 def _plain_text_to_html(text: str) -> str:

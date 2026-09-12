@@ -1,4 +1,7 @@
 .env
+.env.mycopy
+profile.toml
+profile.toml.mycopy
 service-account.json
 seen.txt
 matches.jsonl
